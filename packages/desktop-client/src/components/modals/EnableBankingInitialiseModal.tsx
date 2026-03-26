@@ -1,0 +1,209 @@
+import { useState } from 'react';
+import type { ChangeEvent } from 'react';
+import { Trans, useTranslation } from 'react-i18next';
+
+import { ButtonWithLoading } from '@actual-app/components/button';
+import { InitialFocus } from '@actual-app/components/initial-focus';
+import { Input } from '@actual-app/components/input';
+import { Text } from '@actual-app/components/text';
+import { View } from '@actual-app/components/view';
+
+import { send } from 'loot-core/platform/client/connection';
+import { getSecretsError } from 'loot-core/shared/errors';
+
+import { Error as ErrorAlert } from '@desktop-client/components/alerts';
+import { Link } from '@desktop-client/components/common/Link';
+import {
+  Modal,
+  ModalButtons,
+  ModalCloseButton,
+  ModalHeader,
+} from '@desktop-client/components/common/Modal';
+import { FormField, FormLabel } from '@desktop-client/components/forms';
+import type { Modal as ModalType } from '@desktop-client/modals/modalsSlice';
+
+type EnableBankingInitialiseProps = Extract<
+  ModalType,
+  { name: 'enablebanking-init' }
+>['options'];
+
+export function EnableBankingInitialiseModal({
+  onSuccess,
+}: EnableBankingInitialiseProps) {
+  const { t } = useTranslation();
+  const [applicationId, setApplicationId] = useState('');
+  const [secretKey, setSecretKey] = useState('');
+  const [isValid, setIsValid] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(
+    t('It is required to provide both the Application ID and the secret key.'),
+  );
+
+  async function onFileChange(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const text = await file.text();
+    setSecretKey(text);
+    setIsValid(true);
+  }
+
+  async function onSubmit(close: () => void) {
+    if (!applicationId || !secretKey) {
+      setIsValid(false);
+      setError(
+        t(
+          'It is required to provide both the Application ID and the secret key.',
+        ),
+      );
+      return;
+    }
+
+    setIsLoading(true);
+
+    let { error, reason } =
+      (await send('secret-set', {
+        name: 'enablebanking_applicationId',
+        value: applicationId,
+      })) || {};
+
+    if (error) {
+      setIsLoading(false);
+      setIsValid(false);
+      setError(getSecretsError(error, reason));
+      return;
+    }
+
+    ({ error, reason } =
+      (await send('secret-set', {
+        name: 'enablebanking_secretKey',
+        value: secretKey,
+      })) || {});
+
+    if (error) {
+      setIsLoading(false);
+      setIsValid(false);
+      setError(getSecretsError(error, reason));
+      return;
+    }
+
+    // Validate credentials by checking the application status
+    const statusResult = await send('enablebanking-status');
+    if (statusResult.error) {
+      setIsLoading(false);
+      setIsValid(false);
+      setError(
+        t(
+          'Could not validate the credentials. Please check your Application ID and secret key.',
+        ),
+      );
+      return;
+    }
+
+    setIsValid(true);
+    onSuccess();
+    setIsLoading(false);
+    close();
+  }
+
+  return (
+    <Modal
+      name="enablebanking-init"
+      containerProps={{ style: { width: '30vw' } }}
+    >
+      {({ state }) => (
+        <>
+          <ModalHeader
+            title={t('Set up Enable Banking')}
+            rightContent={<ModalCloseButton onPress={() => state.close()} />}
+          />
+          <View style={{ display: 'flex', gap: 10 }}>
+            <Text>
+              <Trans>
+                In order to enable bank sync via Enable Banking (for EU banks)
+                you will need to create application credentials. This can be
+                done by creating an account at{' '}
+                <Link
+                  variant="external"
+                  to="https://enablebanking.com/cp/applications"
+                  linkColor="purple"
+                >
+                  Enable Banking
+                </Link>
+                .
+              </Trans>
+            </Text>
+
+            <Text>
+              <Trans>
+                When setting up your application, use the following as the
+                redirect URL:
+              </Trans>{' '}
+              <code>{window.location.origin}/enablebanking/auth_callback</code>
+            </Text>
+
+            {window.location.protocol === 'http:' && (
+              <ErrorAlert>
+                <Trans>
+                  Enable Banking requires HTTPS for the redirect URL. Your
+                  current connection is not secure.
+                </Trans>
+              </ErrorAlert>
+            )}
+
+            <FormField>
+              <FormLabel
+                title={t('Application ID:')}
+                htmlFor="application-id-field"
+              />
+              <InitialFocus>
+                <Input
+                  id="application-id-field"
+                  type="text"
+                  value={applicationId}
+                  onChangeValue={value => {
+                    setApplicationId(value);
+                    setIsValid(true);
+                  }}
+                />
+              </InitialFocus>
+            </FormField>
+
+            <FormField>
+              <FormLabel
+                title={t('Secret Key (.pem file):')}
+                htmlFor="secret-key-field"
+              />
+              <input
+                id="secret-key-field"
+                type="file"
+                accept=".pem,.key"
+                onChange={onFileChange}
+              />
+            </FormField>
+
+            {secretKey && (
+              <Text style={{ fontSize: 12, color: '#666' }}>
+                <Trans>Secret key loaded successfully.</Trans>
+              </Text>
+            )}
+
+            {!isValid && <ErrorAlert>{error}</ErrorAlert>}
+          </View>
+
+          <ModalButtons>
+            <ButtonWithLoading
+              variant="primary"
+              isLoading={isLoading}
+              onPress={() => {
+                void onSubmit(() => state.close());
+              }}
+            >
+              <Trans>Save and continue</Trans>
+            </ButtonWithLoading>
+          </ModalButtons>
+        </>
+      )}
+    </Modal>
+  );
+}

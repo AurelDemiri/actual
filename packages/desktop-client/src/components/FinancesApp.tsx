@@ -13,6 +13,7 @@ import * as undo from 'loot-core/platform/client/undo';
 import { UserAccessPage } from './admin/UserAccess/UserAccessPage';
 import { BankSyncStatus } from './BankSyncStatus';
 import { CommandBar } from './CommandBar';
+import { EnableBankingCallback } from './EnableBankingCallback';
 import { GlobalKeys } from './GlobalKeys';
 import { MobileBankSyncAccountEditPage } from './mobile/banksync/MobileBankSyncAccountEditPage';
 import { MobileNavTabs } from './mobile/MobileNavTabs';
@@ -317,6 +318,11 @@ export function FinancesApp() {
                       <WideComponent name="GoCardlessLink" />
                     </NarrowNotSupported>
                   }
+                />
+
+                <Route
+                  path="/enablebanking/auth_callback"
+                  element={<EnableBankingCallback />}
                 />
 
                 <Route

@@ -315,6 +315,43 @@ async function downloadPluggyAiTransactions(
   return retVal;
 }
 
+async function downloadEnableBankingTransactions(
+  acctId: string,
+  since: string,
+) {
+  const userToken = await asyncStorage.getItem('user-token');
+  if (!userToken) return;
+
+  logger.log('Pulling transactions from Enable Banking');
+
+  const res = await post(
+    getServer().ENABLEBANKING_SERVER + '/transactions',
+    {
+      accountId: acctId,
+      startDate: since,
+    },
+    {
+      'X-ACTUAL-TOKEN': userToken,
+    },
+  );
+
+  if (res.error_code) {
+    throw BankSyncError(res.error_type, res.error_code);
+  }
+
+  const {
+    transactions: { all },
+    balances,
+    startingBalance,
+  } = res;
+
+  return {
+    transactions: all,
+    accountBalance: balances,
+    startingBalance,
+  };
+}
+
 async function resolvePayee(trans, payeeName, payeesToCreate) {
   if (trans.payee == null && payeeName) {
     // First check our registry of new payees (to avoid a db access)
@@ -999,6 +1036,11 @@ async function processBankSyncDownload(
         currentBalance,
       );
       balanceToUse = Math.round(previousBalance);
+    } else if (acctRow.account_sync_source === 'enableBanking') {
+      const previousBalance = transactions.reduce((total, trans) => {
+        return total - amountToInteger(trans.transactionAmount.amount);
+      }, currentBalance);
+      balanceToUse = previousBalance;
     }
 
     const oldestTransaction = transactions[transactions.length - 1];
@@ -1008,7 +1050,8 @@ async function processBankSyncDownload(
     if (customStartingDate) {
       startingBalanceDate = customStartingDate;
     } else if (transactions.length > 0) {
-      startingBalanceDate = oldestTransaction.date;
+      startingBalanceDate =
+        oldestTransaction.date ?? oldestTransaction.bookingDate;
     } else {
       startingBalanceDate = monthUtils.currentDay();
     }
@@ -1016,15 +1059,23 @@ async function processBankSyncDownload(
     const payee = await getStartingBalancePayee();
 
     return runMutator(async () => {
-      const initialId = await db.insertTransaction({
-        account: id,
-        amount: balanceToUse,
-        category: acctRow.offbudget === 0 ? payee.category : null,
-        payee: payee.id,
-        date: startingBalanceDate,
-        cleared: true,
-        starting_balance_flag: true,
-      });
+      // Check if a starting balance transaction already exists for this account
+      const existingStartingBalance = await db.first(
+        'SELECT id FROM transactions WHERE acct = ? AND starting_balance_flag = 1 AND tombstone = 0',
+        [id],
+      );
+
+      const initialId = existingStartingBalance
+        ? existingStartingBalance.id
+        : await db.insertTransaction({
+            account: id,
+            amount: balanceToUse,
+            category: acctRow.offbudget === 0 ? payee.category : null,
+            payee: payee.id,
+            date: startingBalanceDate,
+            cleared: true,
+            starting_balance_flag: true,
+          });
 
       const result = await reconcileTransactions(
         id,
@@ -1096,6 +1147,8 @@ export async function syncAccount(
       syncStartDate,
       newAccount,
     );
+  } else if (acctRow.account_sync_source === 'enableBanking') {
+    download = await downloadEnableBankingTransactions(acctId, syncStartDate);
   } else {
     throw new Error(
       `Unrecognized bank-sync provider: ${acctRow.account_sync_source}`,

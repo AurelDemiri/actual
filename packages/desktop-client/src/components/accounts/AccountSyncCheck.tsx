@@ -73,6 +73,12 @@ function useErrorMessage() {
           'This account was not found in SimpleFIN. Try unlinking and relinking the account.',
         );
 
+      case 'EXPIRED_SESSION':
+      case 'CLOSED_SESSION':
+        return t(
+          'Your Enable Banking session has expired. Please reauthorize your bank connection.',
+        );
+
       default:
     }
 

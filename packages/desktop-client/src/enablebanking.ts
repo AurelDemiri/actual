@@ -1,0 +1,110 @@
+import { sendCatch } from 'loot-core/platform/client/connection';
+import type { SyncServerEnableBankingAccount } from 'loot-core/types/models';
+
+import { pushModal } from './modals/modalsSlice';
+import type { AppDispatch } from './redux/store';
+
+function _authorize(
+  dispatch: AppDispatch,
+  {
+    onSuccess,
+    onClose,
+  }: {
+    onSuccess: (data: {
+      accounts: SyncServerEnableBankingAccount[];
+    }) => Promise<void>;
+    onClose?: () => void;
+  },
+) {
+  dispatch(
+    pushModal({
+      modal: {
+        name: 'enablebanking-external-msg',
+        options: {
+          onMoveExternal: async ({ aspspId, country }) => {
+            const redirectUrl = `${window.location.origin}/enablebanking/auth_callback`;
+            const resp = await sendCatch('enablebanking-start-auth', {
+              aspspId,
+              country,
+              redirectUrl,
+            });
+
+            if (resp.error) {
+              return {
+                error: 'unknown' as const,
+                message: resp.error.message,
+              };
+            }
+
+            const authData = resp.data;
+
+            if (authData?.error) {
+              return {
+                error: 'unknown' as const,
+                message: authData.error,
+              };
+            }
+
+            const authUrl = authData?.data?.url ?? authData?.url;
+            const state = authData?.data?.state ?? authData?.state;
+
+            if (!authUrl || !state) {
+              return {
+                error: 'unknown' as const,
+                message: 'Missing auth URL or state',
+              };
+            }
+
+            localStorage.setItem('enablebanking_auth_state', state);
+            window.open(
+              authUrl,
+              'enablebanking-auth',
+              'width=600,height=700,popup=yes',
+            );
+
+            const pollResp = await sendCatch('enablebanking-poll-auth', {
+              state,
+            });
+
+            if (pollResp.error) {
+              if (pollResp.error.message === 'timeout') {
+                return { error: 'timeout' as const };
+              }
+
+              return {
+                error: 'unknown' as const,
+                message: pollResp.error.message,
+              };
+            }
+
+            const pollData = pollResp.data;
+            const accounts: SyncServerEnableBankingAccount[] =
+              pollData?.data?.accounts ?? pollData?.accounts ?? [];
+
+            return { data: { accounts } };
+          },
+          onClose,
+          onSuccess,
+        },
+      },
+    }),
+  );
+}
+
+export async function authorizeBank(dispatch: AppDispatch) {
+  _authorize(dispatch, {
+    onSuccess: async data => {
+      dispatch(
+        pushModal({
+          modal: {
+            name: 'select-linked-accounts',
+            options: {
+              externalAccounts: data.accounts,
+              syncSource: 'enableBanking',
+            },
+          },
+        }),
+      );
+    },
+  });
+}
