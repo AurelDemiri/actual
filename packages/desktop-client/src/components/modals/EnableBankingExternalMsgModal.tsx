@@ -31,7 +31,7 @@ import { pushModal } from '@desktop-client/modals/modalsSlice';
 import type { Modal as ModalType } from '@desktop-client/modals/modalsSlice';
 import { useDispatch } from '@desktop-client/redux';
 
-function useAvailableBanks(country: string) {
+function useAvailableBanks(country: string, refetchKey?: boolean | null) {
   const [banks, setBanks] = useState<{ id: string; name: string }[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isError, setIsError] = useState(false);
@@ -70,7 +70,7 @@ function useAvailableBanks(country: string) {
     }
 
     void fetch();
-  }, [setBanks, setIsLoading, country]);
+  }, [setBanks, setIsLoading, country, refetchKey]);
 
   return {
     data: banks,
@@ -136,37 +136,45 @@ export function EnableBankingExternalMsgModal({
     data: bankOptions,
     isLoading: isBankOptionsLoading,
     isError: isBankOptionError,
-  } = useAvailableBanks(country);
+  } = useAvailableBanks(country, isEnableBankingSetupComplete);
   const {
     configuredEnableBanking: isConfigured,
     isLoading: isConfigurationLoading,
   } = useEnableBankingStatus();
 
+  const isJumpingRef = useRef(false);
+
   async function onJump() {
-    setError(null);
-    setWaiting('browser');
+    if (isJumpingRef.current) return;
+    isJumpingRef.current = true;
 
-    // Parse aspspId (name) and country from the composite id "country:name"
-    const colonIndex = selectedAspsp.indexOf(':');
-    const aspspCountry = selectedAspsp.slice(0, colonIndex);
-    const aspspId = selectedAspsp.slice(colonIndex + 1);
+    try {
+      setError(null);
+      setWaiting('browser');
 
-    const res = await onMoveExternal({ aspspId, country: aspspCountry });
-    if ('error' in res) {
-      setError({
-        code: res.error,
-        message: 'message' in res ? res.message : undefined,
-      });
+      // Parse aspspId (name) and country from the composite id "country:name"
+      const colonIndex = selectedAspsp.indexOf(':');
+      const aspspCountry = selectedAspsp.slice(0, colonIndex);
+      const aspspId = selectedAspsp.slice(colonIndex + 1);
+
+      const res = await onMoveExternal({ aspspId, country: aspspCountry });
+      if ('error' in res) {
+        setError({
+          code: res.error,
+          message: 'message' in res ? res.message : undefined,
+        });
+        setWaiting(null);
+        return;
+      }
+
+      data.current = res.data;
+      setWaiting('accounts');
+      await onSuccess(data.current);
       setWaiting(null);
-      return;
+    } finally {
+      isJumpingRef.current = false;
     }
-
-    data.current = res.data;
-    setWaiting('accounts');
-    await onSuccess(data.current);
-    setWaiting(null);
   }
-
 
   const onEnableBankingInit = () => {
     dispatch(
@@ -193,7 +201,10 @@ export function EnableBankingExternalMsgModal({
             strict
             highlightFirst
             suggestions={COUNTRY_OPTIONS}
-            onSelect={setCountry}
+            onSelect={value => {
+              setCountry(value);
+              setSelectedAspsp(undefined);
+            }}
             value={country}
             inputProps={{
               id: 'country-field',

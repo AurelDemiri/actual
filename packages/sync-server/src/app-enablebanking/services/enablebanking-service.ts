@@ -105,25 +105,45 @@ function getAuthorizationHeader(): string {
   return `Bearer ${token}`;
 }
 
+const REQUEST_TIMEOUT_MS = 30_000; // 30 seconds
+
 async function request<T>(
   method: string,
   path: string,
   body?: unknown,
+  authHeaderOverride?: string,
 ): Promise<T> {
   const url = `${BASE_URL}${path}`;
   debug('%s %s', method, url);
 
   const headers: Record<string, string> = {
-    Authorization: getAuthorizationHeader(),
+    Authorization: authHeaderOverride ?? getAuthorizationHeader(),
     'Content-Type': 'application/json',
   };
 
-  const options: RequestInit = { method, headers };
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+  const options: RequestInit = { method, headers, signal: controller.signal };
   if (body !== undefined) {
     options.body = JSON.stringify(body);
   }
 
-  const response = await fetch(url, options);
+  let response: Response;
+  try {
+    response = await fetch(url, options);
+  } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new EnableBankingError(
+        'TIMED_OUT',
+        'TIMED_OUT',
+        'Request timed out',
+      );
+    }
+    throw error;
+  } finally {
+    clearTimeout(timer);
+  }
 
   if (!response.ok) {
     let responseBody: unknown;
@@ -149,10 +169,10 @@ export function normalizeTransaction(
   const valueDate = tx.value_date;
 
   let payeeName = '';
-  if (tx.credit_debit_indicator === 'CRDT' && tx.creditor?.name) {
-    payeeName = tx.creditor.name;
-  } else if (tx.credit_debit_indicator === 'DBIT' && tx.debtor?.name) {
+  if (tx.credit_debit_indicator === 'CRDT' && tx.debtor?.name) {
     payeeName = tx.debtor.name;
+  } else if (tx.credit_debit_indicator === 'DBIT' && tx.creditor?.name) {
+    payeeName = tx.creditor.name;
   } else if (tx.creditor?.name) {
     payeeName = tx.creditor.name;
   } else if (tx.debtor?.name) {
@@ -168,16 +188,18 @@ export function normalizeTransaction(
     ? tx.remittance_information.join(' ')
     : undefined;
 
+  // Normalize amount: strip any existing sign, then prefix '-' for debits
+  const rawAmount = tx.transaction_amount.amount.trim().replace(/^[+-]/, '');
+  const signedAmount =
+    tx.credit_debit_indicator === 'DBIT' ? '-' + rawAmount : rawAmount;
+
   return {
     transactionId,
     date: bookingDate,
     bookingDate,
     valueDate,
     transactionAmount: {
-      amount:
-        tx.credit_debit_indicator === 'DBIT'
-          ? '-' + tx.transaction_amount.amount
-          : tx.transaction_amount.amount,
+      amount: signedAmount,
       currency: tx.transaction_amount.currency,
     },
     payeeName,
@@ -220,6 +242,19 @@ export const enableBankingService = {
     );
     const secretKey = secretsService.get(SecretName.enablebanking_secretKey);
     return !!(applicationId && secretKey);
+  },
+
+  async validateCredentials(
+    applicationId: string,
+    secretKey: string,
+  ): Promise<unknown> {
+    const token = getJWT(applicationId, secretKey);
+    return request<unknown>(
+      'GET',
+      '/application',
+      undefined,
+      `Bearer ${token}`,
+    );
   },
 
   async getApplication(): Promise<unknown> {

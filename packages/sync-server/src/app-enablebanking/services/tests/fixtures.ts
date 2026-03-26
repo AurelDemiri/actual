@@ -74,7 +74,8 @@ export const mockCreditTransaction = {
 export const mockDebitTransaction = {
   entry_reference: 'ref-002',
   transaction_amount: { currency: 'EUR', amount: '-25.99' },
-  debtor: { name: 'Grocery Store' },
+  creditor: { name: 'Grocery Store' },
+  debtor: { name: 'My Account' },
   credit_debit_indicator: 'DBIT' as const,
   status: 'BOOK' as const,
   booking_date: '2026-03-02',

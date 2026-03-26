@@ -24,113 +24,143 @@ export { app as handlers };
 app.use(requestLoggerMiddleware);
 app.use(express.json());
 
+// --- Shared helpers ---
+
+async function buildSessionResult(session: {
+  session_id: string;
+  accounts: { uid: string; [key: string]: unknown }[];
+  aspsp?: { name?: string; country?: string };
+}) {
+  const accountsWithBalances = await Promise.all(
+    session.accounts.map(async account => {
+      const normalized = normalizeAccount(
+        account as Parameters<typeof normalizeAccount>[0],
+        session.aspsp,
+      );
+
+      let balances: ReturnType<typeof normalizeBalance>[] = [];
+      try {
+        const balanceResult = await enableBankingService.getBalances(
+          account.uid,
+        );
+        balances = balanceResult.balances.map(normalizeBalance);
+      } catch (err) {
+        debug('Failed to fetch balances for account %s: %s', account.uid, err);
+      }
+
+      const preferredBalance =
+        balances.find(b => b.balanceType === 'CLAV') ?? balances[0];
+
+      return {
+        ...normalized,
+        balance: preferredBalance ? preferredBalance.balanceAmount.amount : 0,
+        balances,
+      };
+    }),
+  );
+
+  return {
+    session_id: session.session_id,
+    accounts: accountsWithBalances,
+    aspsp: session.aspsp,
+  };
+}
+
 // Auth callback from bank redirect — must be before validateSessionMiddleware
 // since the bank redirects here directly (no auth token available)
-app.get(
-  '/auth_callback',
-  async (req: Request, res: Response) => {
-    const code = req.query.code as string | undefined;
-    const state = req.query.state as string | undefined;
+app.get('/auth_callback', async (req: Request, res: Response) => {
+  const code = req.query.code as string | undefined;
+  const state = req.query.state as string | undefined;
 
-    if (!code) {
-      res.status(400).send(
+  if (!code) {
+    res
+      .status(400)
+      .send(
         '<html><body><p>Authorization failed: missing code.</p></body></html>',
       );
-      return;
+    return;
+  }
+
+  if (!state) {
+    res
+      .status(400)
+      .send(
+        '<html><body><p>Authorization failed: missing state parameter.</p></body></html>',
+      );
+    return;
+  }
+
+  try {
+    const session = await enableBankingService.createSession(code);
+    debug(
+      'Callback session created: %s with %d accounts',
+      session.session_id,
+      session.accounts.length,
+    );
+
+    const result = await buildSessionResult(session);
+
+    // Always cache the result so retries within TTL can read it
+    completedAuths.set(state, result);
+    setTimeout(() => completedAuths.delete(state), COMPLETED_AUTH_TTL_MS);
+
+    if (pendingAuths.has(state)) {
+      const pending = pendingAuths.get(state)!;
+      pending.resolve(result);
+      cleanupPendingAuth(state);
     }
 
-    try {
-      const session = await enableBankingService.createSession(code);
-      debug(
-        'Callback session created: %s with %d accounts',
-        session.session_id,
-        session.accounts.length,
-      );
+    res.send(
+      '<html><body><p>Authorization successful. This window will close.</p>' +
+        '<script>setTimeout(function(){window.close()},1000)</script></body></html>',
+    );
+  } catch (error) {
+    const errorResult = {
+      error: error instanceof Error ? error.message : 'unknown error',
+    };
 
-      const accountsWithBalances = await Promise.all(
-        session.accounts.map(async account => {
-          const normalized = normalizeAccount(account, session.aspsp);
+    completedAuths.set(state, errorResult);
+    setTimeout(() => completedAuths.delete(state), COMPLETED_AUTH_TTL_MS);
 
-          let balances: ReturnType<typeof normalizeBalance>[] = [];
-          try {
-            const balanceResult = await enableBankingService.getBalances(
-              account.uid,
-            );
-            balances = balanceResult.balances.map(normalizeBalance);
-          } catch (err) {
-            debug(
-              'Failed to fetch balances for account %s: %s',
-              account.uid,
-              err,
-            );
-          }
+    if (pendingAuths.has(state)) {
+      const pending = pendingAuths.get(state)!;
+      pending.reject(error);
+      cleanupPendingAuth(state);
+    }
 
-          const preferredBalance =
-            balances.find(b => b.balanceType === 'CLAV') ?? balances[0];
-
-          return {
-            ...normalized,
-            balance: preferredBalance
-              ? preferredBalance.balanceAmount.amount
-              : 0,
-            balances,
-          };
-        }),
-      );
-
-      const result = {
-        session_id: session.session_id,
-        accounts: accountsWithBalances,
-        aspsp: session.aspsp,
-      };
-
-      if (state && pendingAuths.has(state)) {
-        const pending = pendingAuths.get(state)!;
-        pending.resolve(result);
-        cleanupPendingAuth(state);
-      } else if (state) {
-        completedAuths.set(state, result);
-        setTimeout(() => completedAuths.delete(state), COMPLETED_AUTH_TTL_MS);
-      }
-
-      res.send(
-        '<html><body><p>Authorization successful. This window will close.</p>' +
-          '<script>setTimeout(function(){window.close()},1000)</script></body></html>',
-      );
-    } catch (error) {
-      if (state && pendingAuths.has(state)) {
-        const pending = pendingAuths.get(state)!;
-        pending.reject(error);
-        cleanupPendingAuth(state);
-      }
-
-      debug('Callback auth error: %s', error);
-      res.status(500).send(
+    debug('Callback auth error: %s', error);
+    res
+      .status(500)
+      .send(
         '<html><body><p>Authorization failed. You can close this window and try again.</p></body></html>',
       );
-    }
-  },
-);
+  }
+});
 
 app.use(validateSessionMiddleware);
 
 // --- Poll/complete-auth coordination ---
 
 type PendingAuth = {
+  id: string;
   resolve: (value: unknown) => void;
   reject: (reason: unknown) => void;
   timer: ReturnType<typeof setTimeout>;
 };
 
+// NOTE: These in-memory maps make the auth handoff process-local.
+// Multi-instance deployments require sticky routing so the same instance
+// handles both the callback and client poll for a given state.
 const pendingAuths = new Map<string, PendingAuth>();
 const completedAuths = new Map<string, unknown>();
+let nextWaiterId = 0;
 
 const POLL_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
 const COMPLETED_AUTH_TTL_MS = 30 * 1000; // 30 seconds
 
-function cleanupPendingAuth(state: string) {
+function cleanupPendingAuth(state: string, waiterId?: string) {
   const entry = pendingAuths.get(state);
-  if (entry) {
+  if (entry && (waiterId == null || entry.id === waiterId)) {
     clearTimeout(entry.timer);
     pendingAuths.delete(state);
   }
@@ -168,23 +198,15 @@ app.post(
       return;
     }
 
-    // Store the credentials
-    secretsService.set(SecretName.enablebanking_applicationId, applicationId);
-    secretsService.set(SecretName.enablebanking_secretKey, secretKey);
-
-    // Validate by calling getApplication
+    // Validate credentials before persisting to avoid exposing
+    // transient bad creds to concurrent requests
     try {
-      const appInfo = await enableBankingService.getApplication();
+      const appInfo = await enableBankingService.validateCredentials(
+        applicationId,
+        secretKey,
+      );
       debug('Enable Banking application validated: %o', appInfo);
-
-      res.send({
-        status: 'ok',
-        data: {
-          configured: true,
-        },
-      });
     } catch (error) {
-      // Roll back stored credentials on failure
       debug('Enable Banking configuration validation failed: %s', error);
       res.send({
         status: 'ok',
@@ -193,7 +215,19 @@ app.post(
           error_type: error instanceof Error ? error.message : 'unknown error',
         },
       });
+      return;
     }
+
+    // Only persist after successful validation
+    secretsService.set(SecretName.enablebanking_applicationId, applicationId);
+    secretsService.set(SecretName.enablebanking_secretKey, secretKey);
+
+    res.send({
+      status: 'ok',
+      data: {
+        configured: true,
+      },
+    });
   }),
 );
 
@@ -287,50 +321,18 @@ app.post(
         session.accounts.length,
       );
 
-      // Normalize accounts and fetch balances
-      const accountsWithBalances = await Promise.all(
-        session.accounts.map(async account => {
-          const normalized = normalizeAccount(account, session.aspsp);
+      const result = await buildSessionResult(session);
 
-          let balances: ReturnType<typeof normalizeBalance>[] = [];
-          try {
-            const balanceResult = await enableBankingService.getBalances(
-              account.uid,
-            );
-            balances = balanceResult.balances.map(normalizeBalance);
-          } catch (err) {
-            debug(
-              'Failed to fetch balances for account %s: %s',
-              account.uid,
-              err,
-            );
-          }
-
-          const preferredBalance =
-            balances.find(b => b.balanceType === 'CLAV') ?? balances[0];
-
-          return {
-            ...normalized,
-            balance: preferredBalance ? preferredBalance.balanceAmount.amount : 0,
-            balances,
-          };
-        }),
-      );
-
-      const result = {
-        session_id: session.session_id,
-        accounts: accountsWithBalances,
-        aspsp: session.aspsp,
-      };
-
-      // Resolve any pending poll-auth promise, or store for later pickup
-      if (state && pendingAuths.has(state)) {
-        const pending = pendingAuths.get(state)!;
-        pending.resolve(result);
-        cleanupPendingAuth(state);
-      } else if (state) {
+      // Always cache so retries within TTL can read the result
+      if (state) {
         completedAuths.set(state, result);
         setTimeout(() => completedAuths.delete(state), COMPLETED_AUTH_TTL_MS);
+
+        if (pendingAuths.has(state)) {
+          const pending = pendingAuths.get(state)!;
+          pending.resolve(result);
+          cleanupPendingAuth(state);
+        }
       }
 
       res.send({
@@ -338,18 +340,24 @@ app.post(
         data: result,
       });
     } catch (error) {
-      // Reject any pending poll-auth promise
-      if (state && pendingAuths.has(state)) {
-        const pending = pendingAuths.get(state)!;
-        pending.reject(error);
-        cleanupPendingAuth(state);
+      const errorResult = {
+        error: error instanceof Error ? error.message : 'unknown error',
+      };
+
+      if (state) {
+        completedAuths.set(state, errorResult);
+        setTimeout(() => completedAuths.delete(state), COMPLETED_AUTH_TTL_MS);
+
+        if (pendingAuths.has(state)) {
+          const pending = pendingAuths.get(state)!;
+          pending.reject(error);
+          cleanupPendingAuth(state);
+        }
       }
 
       res.send({
         status: 'ok',
-        data: {
-          error: error instanceof Error ? error.message : 'unknown error',
-        },
+        data: errorResult,
       });
     }
   }),
@@ -371,6 +379,8 @@ app.post(
       return;
     }
 
+    const waiterId = String(++nextWaiterId);
+
     try {
       // If complete-auth already fired before poll-auth, return immediately
       if (completedAuths.has(state)) {
@@ -381,12 +391,44 @@ app.post(
       }
 
       const result = await new Promise((resolve, reject) => {
+        // Clean up any existing waiter for this state
+        if (pendingAuths.has(state)) {
+          const existing = pendingAuths.get(state)!;
+          clearTimeout(existing.timer);
+          existing.reject(new Error('Poll superseded'));
+        }
+
+        let settled = false;
+        const safeResolve = (value: unknown) => {
+          if (settled) return;
+          settled = true;
+          resolve(value);
+        };
+        const safeReject = (reason: unknown) => {
+          if (settled) return;
+          settled = true;
+          reject(reason);
+        };
+
         const timer = setTimeout(() => {
-          pendingAuths.delete(state);
-          reject(new Error('Polling timed out'));
+          cleanupPendingAuth(state, waiterId);
+          safeReject(new Error('Polling timed out'));
         }, POLL_TIMEOUT_MS);
 
-        pendingAuths.set(state, { resolve, reject, timer });
+        pendingAuths.set(state, {
+          id: waiterId,
+          resolve: safeResolve,
+          reject: safeReject,
+          timer,
+        });
+
+        // Clean up if client disconnects before resolution
+        res.on('close', () => {
+          if (!res.writableFinished && !settled) {
+            cleanupPendingAuth(state, waiterId);
+            safeReject(new Error('Client disconnected'));
+          }
+        });
       });
 
       res.send({
@@ -394,7 +436,7 @@ app.post(
         data: result,
       });
     } catch (error) {
-      cleanupPendingAuth(state);
+      cleanupPendingAuth(state, waiterId);
       res.send({
         status: 'ok',
         data: {
@@ -432,10 +474,12 @@ app.post(
       const balanceResult = await enableBankingService.getBalances(accountId);
       const balances = balanceResult.balances.map(normalizeBalance);
 
-      // Determine starting balance from the first available balance
+      // Determine starting balance, preferring CLAV balance type
       let startingBalance = 0;
       if (balances.length > 0) {
-        startingBalance = balances[0].balanceAmount.amount;
+        const preferredBalance =
+          balances.find(b => b.balanceType === 'CLAV') ?? balances[0];
+        startingBalance = preferredBalance.balanceAmount.amount;
       }
 
       // Fetch all paginated transactions

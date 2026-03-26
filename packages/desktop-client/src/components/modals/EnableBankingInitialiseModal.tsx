@@ -9,7 +9,6 @@ import { Text } from '@actual-app/components/text';
 import { View } from '@actual-app/components/view';
 
 import { send } from 'loot-core/platform/client/connection';
-import { getSecretsError } from 'loot-core/shared/errors';
 
 import { Error as ErrorAlert } from '@desktop-client/components/alerts';
 import { Link } from '@desktop-client/components/common/Link';
@@ -61,49 +60,36 @@ export function EnableBankingInitialiseModal({
 
     setIsLoading(true);
 
-    let { error, reason } =
-      (await send('secret-set', {
-        name: 'enablebanking_applicationId',
-        value: applicationId,
-      })) || {};
+    try {
+      const result = await send('enablebanking-configure', {
+        applicationId,
+        secretKey,
+      });
 
-    if (error) {
-      setIsLoading(false);
-      setIsValid(false);
-      setError(getSecretsError(error, reason));
-      return;
-    }
+      if (result?.data?.error_code) {
+        setIsValid(false);
+        setError(
+          result.data.error_type ||
+            t(
+              'Could not validate the credentials. Please check your Application ID and secret key.',
+            ),
+        );
+        return;
+      }
 
-    ({ error, reason } =
-      (await send('secret-set', {
-        name: 'enablebanking_secretKey',
-        value: secretKey,
-      })) || {});
-
-    if (error) {
-      setIsLoading(false);
-      setIsValid(false);
-      setError(getSecretsError(error, reason));
-      return;
-    }
-
-    // Validate credentials by checking the application status
-    const statusResult = await send('enablebanking-status');
-    if (statusResult.error) {
-      setIsLoading(false);
+      setIsValid(true);
+      onSuccess();
+      close();
+    } catch {
       setIsValid(false);
       setError(
         t(
           'Could not validate the credentials. Please check your Application ID and secret key.',
         ),
       );
-      return;
+    } finally {
+      setIsLoading(false);
     }
-
-    setIsValid(true);
-    onSuccess();
-    setIsLoading(false);
-    close();
   }
 
   return (

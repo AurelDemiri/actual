@@ -73,6 +73,7 @@ export type AccountHandlers = {
   'enablebanking-start-auth': typeof enableBankingStartAuth;
   'enablebanking-complete-auth': typeof enableBankingCompleteAuth;
   'enablebanking-poll-auth': typeof enableBankingPollAuth;
+  'enablebanking-poll-auth-stop': typeof stopEnableBankingPollAuth;
   'enablebanking-configure': typeof enableBankingConfigure;
   'simplefin-accounts': typeof simpleFinAccounts;
   'pluggyai-accounts': typeof pluggyAiAccounts;
@@ -381,6 +382,10 @@ async function linkEnableBankingAccount({
     name: externalAccount.institution ?? t('Unknown'),
   };
 
+  // Enable Banking uses a session-per-account model, so we use the
+  // account-level identifier (account_id) rather than institution-level
+  // IDs. This creates one bank entry per Enable Banking account, unlike
+  // GoCardless (requisitionId) or SimpleFin/PluggyAi (orgDomain/orgId).
   const bank = await link.findOrCreateBank(
     institution,
     externalAccount.account_id,
@@ -934,8 +939,12 @@ async function enableBankingCompleteAuth({
   state,
 }: {
   code: string;
-  state?: string;
+  state: string;
 }) {
+  if (!state) {
+    return { error: 'missing-state' };
+  }
+
   const userToken = await asyncStorage.getItem('user-token');
 
   if (!userToken) {
@@ -956,6 +965,8 @@ async function enableBankingCompleteAuth({
   );
 }
 
+let enableBankingPollController: AbortController | null = null;
+
 async function enableBankingPollAuth({ state }: { state: string }) {
   const userToken = await asyncStorage.getItem('user-token');
 
@@ -968,16 +979,39 @@ async function enableBankingPollAuth({ state }: { state: string }) {
     throw new Error('Failed to get server config.');
   }
 
-  return post(
-    serverConfig.ENABLEBANKING_SERVER + '/poll-auth',
-    { state },
-    {
-      'X-ACTUAL-TOKEN': userToken,
-    },
-  );
+  const controller = new AbortController();
+  enableBankingPollController = controller;
+
+  try {
+    return await post(
+      serverConfig.ENABLEBANKING_SERVER + '/poll-auth',
+      { state },
+      {
+        'X-ACTUAL-TOKEN': userToken,
+      },
+      310000, // slightly longer than server's 5-minute poll timeout
+      controller.signal,
+    );
+  } finally {
+    // Only clear if this is still the active controller
+    if (enableBankingPollController === controller) {
+      enableBankingPollController = null;
+    }
+  }
 }
 
-async function enableBankingConfigure(config: Record<string, unknown>) {
+async function stopEnableBankingPollAuth() {
+  if (enableBankingPollController) {
+    enableBankingPollController.abort();
+    enableBankingPollController = null;
+  }
+  return 'ok';
+}
+
+async function enableBankingConfigure(config: {
+  applicationId: string;
+  secretKey: string;
+}) {
   const userToken = await asyncStorage.getItem('user-token');
 
   if (!userToken) {
@@ -1507,6 +1541,7 @@ app.method('enablebanking-aspsps', enableBankingAspsps);
 app.method('enablebanking-start-auth', enableBankingStartAuth);
 app.method('enablebanking-complete-auth', enableBankingCompleteAuth);
 app.method('enablebanking-poll-auth', enableBankingPollAuth);
+app.method('enablebanking-poll-auth-stop', stopEnableBankingPollAuth);
 app.method('enablebanking-configure', enableBankingConfigure);
 app.method('simplefin-accounts', simpleFinAccounts);
 app.method('pluggyai-accounts', pluggyAiAccounts);

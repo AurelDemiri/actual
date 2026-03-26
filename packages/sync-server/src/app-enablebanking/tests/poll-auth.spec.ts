@@ -357,7 +357,8 @@ describe('Enable Banking Express routes', () => {
           {
             entry_reference: 'ref-1',
             transaction_amount: { currency: 'EUR', amount: '100.00' },
-            creditor: { name: 'Employer' },
+            creditor: { name: 'My Account' },
+            debtor: { name: 'Employer' },
             credit_debit_indicator: 'CRDT',
             status: 'BOOK',
             booking_date: '2026-03-01',
@@ -366,7 +367,8 @@ describe('Enable Banking Express routes', () => {
           {
             entry_reference: 'ref-2',
             transaction_amount: { currency: 'EUR', amount: '-25.00' },
-            debtor: { name: 'Shop' },
+            creditor: { name: 'Shop' },
+            debtor: { name: 'My Account' },
             credit_debit_indicator: 'DBIT',
             status: 'PDNG',
             value_date: '2026-03-02',
@@ -386,8 +388,16 @@ describe('Enable Banking Express routes', () => {
       expect(data.transactions.pending).toHaveLength(1);
       expect(data.transactions.booked[0].payeeName).toBe('Employer');
       expect(data.transactions.booked[0].booked).toBe(true);
+      expect(data.transactions.booked[0].transactionAmount.amount).toBe(
+        '100.00',
+      );
+      expect(data.transactions.booked[0].date).toBe('2026-03-01');
       expect(data.transactions.pending[0].payeeName).toBe('Shop');
       expect(data.transactions.pending[0].booked).toBe(false);
+      expect(data.transactions.pending[0].transactionAmount.amount).toBe(
+        '-25.00',
+      );
+      expect(data.transactions.pending[0].date).toBe('2026-03-02');
 
       expect(data.balances).toHaveLength(1);
       expect(data.balances[0].balanceAmount.amount).toBe(123456);

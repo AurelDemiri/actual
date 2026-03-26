@@ -20,9 +20,9 @@ import {
 } from './fixtures';
 
 describe('normalizeTransaction', () => {
-  it('should use creditor name for CRDT transactions', () => {
+  it('should use debtor name for CRDT transactions', () => {
     const result = normalizeTransaction(mockCreditTransaction);
-    expect(result.payeeName).toBe('Salary Inc');
+    expect(result.payeeName).toBe('My Employer');
     expect(result.booked).toBe(true);
     expect(result.transactionId).toBe('ref-001');
     expect(result.bookingDate).toBe('2026-03-01');
@@ -33,11 +33,12 @@ describe('normalizeTransaction', () => {
     });
   });
 
-  it('should use debtor name for DBIT transactions', () => {
+  it('should use creditor name for DBIT transactions', () => {
     const result = normalizeTransaction(mockDebitTransaction);
     expect(result.payeeName).toBe('Grocery Store');
     expect(result.booked).toBe(true);
     expect(result.transactionId).toBe('ref-002');
+    expect(result.transactionAmount.amount).toBe('-25.99');
   });
 
   it('should mark PDNG transactions as not booked', () => {
