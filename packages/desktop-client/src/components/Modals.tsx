@@ -193,7 +193,16 @@ export function Modals() {
           return <EnableBankingInitialiseModal key={key} {...modal.options} />;
 
         case 'enablebanking-external-msg':
-          return <EnableBankingExternalMsgModal key={key} {...modal.options} />;
+          return (
+            <EnableBankingExternalMsgModal
+              key={key}
+              {...modal.options}
+              onClose={() => {
+                modal.options.onClose?.();
+                void send('enablebanking-poll-auth-stop');
+              }}
+            />
+          );
 
         case 'gocardless-external-msg':
           return (

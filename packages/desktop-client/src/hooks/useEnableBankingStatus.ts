@@ -4,7 +4,7 @@ import { send } from 'loot-core/platform/client/connection';
 
 import { useSyncServerStatus } from './useSyncServerStatus';
 
-export function useEnableBankingStatus() {
+export function useEnableBankingStatus(enabled = true) {
   const [configuredEnableBanking, setConfiguredEnableBanking] = useState<
     boolean | null
   >(null);
@@ -12,19 +12,24 @@ export function useEnableBankingStatus() {
   const status = useSyncServerStatus();
 
   useEffect(() => {
+    if (!enabled) return;
+
     async function fetch() {
       setIsLoading(true);
-
-      const results = await send('enablebanking-status');
-
-      setConfiguredEnableBanking(results.configured || false);
-      setIsLoading(false);
+      try {
+        const results = await send('enablebanking-status');
+        setConfiguredEnableBanking(results.configured || false);
+      } catch {
+        setConfiguredEnableBanking(false);
+      } finally {
+        setIsLoading(false);
+      }
     }
 
     if (status === 'online') {
       void fetch();
     }
-  }, [status]);
+  }, [status, enabled]);
 
   return {
     configuredEnableBanking,

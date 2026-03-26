@@ -42,6 +42,12 @@ export function EnableBankingCallback() {
         return;
       }
 
+      if (!state) {
+        setStatus('error');
+        setErrorMessage(t('Missing authorization state. Please try again.'));
+        return;
+      }
+
       try {
         const result = await send('enablebanking-complete-auth', {
           code,

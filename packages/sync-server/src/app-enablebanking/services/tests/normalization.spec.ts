@@ -20,9 +20,9 @@ import {
 } from './fixtures';
 
 describe('normalizeTransaction', () => {
-  it('should use creditor name for CRDT transactions', () => {
+  it('should use debtor name for CRDT transactions', () => {
     const result = normalizeTransaction(mockCreditTransaction);
-    expect(result.payeeName).toBe('Salary Inc');
+    expect(result.payeeName).toBe('My Employer');
     expect(result.booked).toBe(true);
     expect(result.transactionId).toBe('ref-001');
     expect(result.bookingDate).toBe('2026-03-01');
@@ -33,11 +33,12 @@ describe('normalizeTransaction', () => {
     });
   });
 
-  it('should use debtor name for DBIT transactions', () => {
+  it('should use creditor name for DBIT transactions', () => {
     const result = normalizeTransaction(mockDebitTransaction);
     expect(result.payeeName).toBe('Grocery Store');
     expect(result.booked).toBe(true);
     expect(result.transactionId).toBe('ref-002');
+    expect(result.transactionAmount.amount).toBe('-25.99');
   });
 
   it('should mark PDNG transactions as not booked', () => {
@@ -120,7 +121,7 @@ describe('normalizeAccount', () => {
     expect(result.account_id).toBe('07cc67f4-45d6-494b-adac-09b5cbc7e2b5');
   });
 
-  it('should use name when available', () => {
+  it('should use name when available and aspsp name for institution', () => {
     const result = normalizeAccount(mockSessionAccount, { name: 'Nordea' });
     expect(result.name).toBe('Current Account');
     expect(result.institution).toBe('Nordea');
@@ -134,11 +135,6 @@ describe('normalizeAccount', () => {
   it('should fall back to uid when both name and iban are missing', () => {
     const result = normalizeAccount(mockSessionAccountMinimal);
     expect(result.name).toBe('aaaabbbb-cccc-dddd-eeee-ffff00001111');
-  });
-
-  it('should use aspsp name for institution', () => {
-    const result = normalizeAccount(mockSessionAccount, { name: 'Nordea' });
-    expect(result.institution).toBe('Nordea');
   });
 
   it('should fall back to account_servicer name for institution', () => {

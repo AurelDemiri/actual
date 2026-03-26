@@ -50,12 +50,14 @@ export function handleEnableBankingError(
   }
 
   if (statusCode >= 400 && statusCode < 500) {
-    // Check for closed/expired session errors
+    // Check for closed/expired session errors (case-insensitive)
+    const lowerErrorType = (errorType || '').toLowerCase();
+    const lowerMessage = (message || '').toLowerCase();
     if (
-      errorType === 'CLOSED_SESSION' ||
-      errorType === 'EXPIRED_SESSION' ||
-      message.includes('session') ||
-      message.includes('expired')
+      lowerErrorType === 'closed_session' ||
+      lowerErrorType === 'expired_session' ||
+      lowerMessage.includes('session') ||
+      lowerMessage.includes('expired')
     ) {
       return new EnableBankingError(
         'INVALID_INPUT',

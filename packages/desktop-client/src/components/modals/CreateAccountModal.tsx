@@ -224,7 +224,11 @@ export function CreateAccountModal({
   };
 
   const onConnectEnableBanking = () => {
-    if (!isEnableBankingSetupComplete) {
+    if (isEnableBankingSetupComplete === null) {
+      // Still loading — ignore click
+      return;
+    }
+    if (isEnableBankingSetupComplete === false) {
       onEnableBankingInit();
       return;
     }
@@ -363,7 +367,8 @@ export function CreateAccountModal({
     setIsPluggyAiSetupComplete(configuredPluggyAi);
   }, [configuredPluggyAi]);
 
-  const { configuredEnableBanking } = useEnableBankingStatus();
+  const { configuredEnableBanking } =
+    useEnableBankingStatus(enableBankingEnabled);
   useEffect(() => {
     setIsEnableBankingSetupComplete(configuredEnableBanking);
   }, [configuredEnableBanking]);
@@ -697,7 +702,8 @@ export function CreateAccountModal({
                   {(!isGoCardlessSetupComplete ||
                     !isSimpleFinSetupComplete ||
                     !isPluggyAiSetupComplete ||
-                    (enableBankingEnabled && !isEnableBankingSetupComplete)) &&
+                    (enableBankingEnabled &&
+                      isEnableBankingSetupComplete === false)) &&
                     !canSetSecrets && (
                       <Warning>
                         <Trans>
@@ -708,7 +714,8 @@ export function CreateAccountModal({
                           isGoCardlessSetupComplete ? '' : 'GoCardless',
                           isSimpleFinSetupComplete ? '' : 'SimpleFIN',
                           isPluggyAiSetupComplete ? '' : 'Pluggy.ai',
-                          enableBankingEnabled && !isEnableBankingSetupComplete
+                          enableBankingEnabled &&
+                          isEnableBankingSetupComplete === false
                             ? t('Enable Banking')
                             : '',
                         ]

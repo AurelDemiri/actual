@@ -1,4 +1,12 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  afterAll,
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from 'vitest';
 
 import { EnableBankingError } from '../../utils/errors';
 
@@ -56,6 +64,10 @@ describe('enableBankingService', () => {
 
   afterEach(() => {
     vi.resetAllMocks();
+  });
+
+  afterAll(() => {
+    vi.unstubAllGlobals();
   });
 
   describe('#isConfigured', () => {
@@ -178,7 +190,9 @@ describe('enableBankingService', () => {
       expect(body.aspsp).toEqual({ name: 'Nordea', country: 'FI' });
       expect(body.redirect_url).toBe('https://app.example.com/callback');
       expect(body.state).toBe('test-state-uuid');
-      expect(body.access.valid_until).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+      expect(body.access.valid_until).toMatch(
+        /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d{3}Z$/,
+      );
 
       expect(result).toEqual(mockAuthResponse);
     });
@@ -405,6 +419,20 @@ describe('enableBankingService', () => {
 
       await expect(enableBankingService.getApplication()).rejects.toThrow(
         EnableBankingError,
+      );
+    });
+
+    it('throws TIMED_OUT EnableBankingError on AbortError', async () => {
+      const abortError = new Error('The operation was aborted');
+      abortError.name = 'AbortError';
+      mockFetch.mockRejectedValueOnce(abortError);
+
+      await expect(enableBankingService.getApplication()).rejects.toThrow(
+        expect.objectContaining({
+          name: 'EnableBankingError',
+          error_type: 'TIMED_OUT',
+          error_code: 'TIMED_OUT',
+        }),
       );
     });
   });
