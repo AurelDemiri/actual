@@ -1,3 +1,5 @@
+import { t } from 'i18next';
+
 import { sendCatch } from 'loot-core/platform/client/connection';
 import type { SyncServerEnableBankingAccount } from 'loot-core/types/models';
 
@@ -51,7 +53,7 @@ function _authorize(
             if (!authUrl || !state) {
               return {
                 error: 'unknown' as const,
-                message: 'Missing auth URL or state',
+                message: t('Missing auth URL or state'),
               };
             }
 

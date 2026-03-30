@@ -223,7 +223,7 @@ export function CreateAccountModal({
     }
   };
 
-  const onConnectEnableBanking = () => {
+  const onConnectEnableBanking = async () => {
     if (isEnableBankingSetupComplete === null) {
       // Still loading — ignore click
       return;
@@ -232,7 +232,30 @@ export function CreateAccountModal({
       onEnableBankingInit();
       return;
     }
-    void authorizeEnableBanking(dispatch);
+
+    try {
+      await authorizeEnableBanking(dispatch);
+    } catch (err) {
+      console.error(err);
+      addNotification({
+        notification: {
+          type: 'error',
+          title: t('Error when trying to contact Enable Banking'),
+          message: (err as Error).message,
+          timeout: 5000,
+        },
+      });
+      dispatch(
+        pushModal({
+          modal: {
+            name: 'enablebanking-init',
+            options: {
+              onSuccess: () => setIsEnableBankingSetupComplete(true),
+            },
+          },
+        }),
+      );
+    }
   };
 
   const onGoCardlessInit = () => {

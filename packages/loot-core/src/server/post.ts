@@ -70,7 +70,11 @@ export async function post(
     });
     text = await res.text();
   } catch (err) {
-    if (err instanceof Error && err.name === 'AbortError' && externalSignal?.aborted) {
+    if (
+      err instanceof Error &&
+      err.name === 'AbortError' &&
+      externalSignal?.aborted
+    ) {
       throw new PostError('aborted');
     }
     throw new PostError('network-failure');
@@ -112,12 +116,10 @@ export async function del(url, data, headers = {}, timeout = null) {
   let text;
   let res;
 
-  const controller = new AbortController();
-  const timeoutId =
-    timeout != null ? setTimeout(() => controller.abort(), timeout) : undefined;
-
   try {
-    const signal = timeout != null ? controller.signal : null;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeout);
+    const signal = timeout ? controller.signal : null;
     res = await fetch(url, {
       method: 'DELETE',
       body: JSON.stringify(data),
@@ -127,11 +129,10 @@ export async function del(url, data, headers = {}, timeout = null) {
         'Content-Type': 'application/json',
       },
     });
+    clearTimeout(timeoutId);
     text = await res.text();
   } catch {
     throw new PostError('network-failure');
-  } finally {
-    if (timeoutId != null) clearTimeout(timeoutId);
   }
 
   throwIfNot200(res, text);
@@ -163,12 +164,10 @@ export async function patch(url, data, headers = {}, timeout = null) {
   let text;
   let res;
 
-  const controller = new AbortController();
-  const timeoutId =
-    timeout != null ? setTimeout(() => controller.abort(), timeout) : undefined;
-
   try {
-    const signal = timeout != null ? controller.signal : null;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeout);
+    const signal = timeout ? controller.signal : null;
     res = await fetch(url, {
       method: 'PATCH',
       body: JSON.stringify(data),
@@ -178,11 +177,10 @@ export async function patch(url, data, headers = {}, timeout = null) {
         'Content-Type': 'application/json',
       },
     });
+    clearTimeout(timeoutId);
     text = await res.text();
   } catch {
     throw new PostError('network-failure');
-  } finally {
-    if (timeoutId != null) clearTimeout(timeoutId);
   }
 
   throwIfNot200(res, text);

@@ -69,8 +69,9 @@ async function buildSessionResult(session: {
 // Auth callback from bank redirect — must be before validateSessionMiddleware
 // since the bank redirects here directly (no auth token available)
 app.get('/auth_callback', async (req: Request, res: Response) => {
-  const code = req.query.code as string | undefined;
-  const state = req.query.state as string | undefined;
+  const code = typeof req.query.code === 'string' ? req.query.code : undefined;
+  const state =
+    typeof req.query.state === 'string' ? req.query.state : undefined;
 
   if (!code) {
     res

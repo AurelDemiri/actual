@@ -1,4 +1,7 @@
+import { sign } from 'jws';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { getJWT } from '../jwt';
 
 // Mock jws to avoid needing real RSA keys
 vi.mock('jws', () => ({
@@ -6,10 +9,6 @@ vi.mock('jws', () => ({
     return `${JSON.stringify(header)}.${JSON.stringify(payload)}.mock-signature`;
   }),
 }));
-
-import { sign } from 'jws';
-
-import { getJWT } from '../jwt';
 
 describe('getJWT', () => {
   beforeEach(() => {
@@ -33,22 +32,26 @@ describe('getJWT', () => {
     getJWT('my-app-id', 'my-secret-key');
 
     const callArgs = vi.mocked(sign).mock.calls[0][0];
-    const payload = callArgs.payload as Record<string, unknown>;
+    const rawPayload = callArgs.payload;
+    const payload: { iss: string; aud: string; iat: number; exp: number } =
+      typeof rawPayload === 'string' ? JSON.parse(rawPayload) : rawPayload;
 
     expect(payload.iss).toBe('enablebanking.com');
     expect(payload.aud).toBe('api.enablebanking.com');
     expect(typeof payload.iat).toBe('number');
     expect(typeof payload.exp).toBe('number');
-    expect((payload.exp as number) - (payload.iat as number)).toBe(3600);
+    expect(payload.exp - payload.iat).toBe(3600);
   });
 
   it('should use custom expiry', () => {
     getJWT('my-app-id', 'my-secret-key', 7200);
 
     const callArgs = vi.mocked(sign).mock.calls[0][0];
-    const payload = callArgs.payload as Record<string, unknown>;
+    const rawPayload = callArgs.payload;
+    const payload: { iat: number; exp: number } =
+      typeof rawPayload === 'string' ? JSON.parse(rawPayload) : rawPayload;
 
-    expect((payload.exp as number) - (payload.iat as number)).toBe(7200);
+    expect(payload.exp - payload.iat).toBe(7200);
   });
 
   it('should pass the secret key to jws.sign', () => {

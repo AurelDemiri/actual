@@ -1,3 +1,5 @@
+import express from 'express';
+import request from 'supertest';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Mock all external dependencies before importing the app
@@ -27,7 +29,7 @@ vi.mock('../../app-gocardless/util/handle-error', () => ({
   handleError:
     (fn: Function) =>
     (req: unknown, res: { send: (data: unknown) => void }) => {
-      (fn(req, res) as Promise<void>).catch((err: Error) => {
+      Promise.resolve(fn(req, res)).catch((err: Error) => {
         res.send({
           status: 'ok',
           data: {
@@ -42,9 +44,6 @@ vi.mock('../../app-gocardless/util/handle-error', () => ({
 // Mock fetch globally
 const mockFetch = vi.fn();
 vi.stubGlobal('fetch', mockFetch);
-
-import express from 'express';
-import request from 'supertest';
 
 // We need to dynamically import the handlers after mocks are set up
 const { handlers } = await import('../app-enablebanking');
