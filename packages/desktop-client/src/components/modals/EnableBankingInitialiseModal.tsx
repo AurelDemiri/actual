@@ -6,9 +6,11 @@ import { ButtonWithLoading } from '@actual-app/components/button';
 import { InitialFocus } from '@actual-app/components/initial-focus';
 import { Input } from '@actual-app/components/input';
 import { Text } from '@actual-app/components/text';
+import { theme } from '@actual-app/components/theme';
 import { View } from '@actual-app/components/view';
 
 import { send } from 'loot-core/platform/client/connection';
+import { getSecretsError } from 'loot-core/shared/errors';
 
 import { Error as ErrorAlert } from '@desktop-client/components/alerts';
 import { Link } from '@desktop-client/components/common/Link';
@@ -65,6 +67,12 @@ export function EnableBankingInitialiseModal({
         applicationId,
         secretKey,
       });
+
+      if (result?.error) {
+        setIsValid(false);
+        setError(getSecretsError(result.error, result.reason));
+        return;
+      }
 
       if (result?.data?.error_code) {
         setIsValid(false);
@@ -169,7 +177,7 @@ export function EnableBankingInitialiseModal({
             </FormField>
 
             {secretKey && (
-              <Text style={{ fontSize: 12, color: '#666' }}>
+              <Text style={{ fontSize: 12, color: theme.pageTextSubdued }}>
                 <Trans>Secret key loaded successfully.</Trans>
               </Text>
             )}

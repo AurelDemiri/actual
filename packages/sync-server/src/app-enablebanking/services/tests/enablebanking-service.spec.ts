@@ -8,7 +8,19 @@ import {
   vi,
 } from 'vitest';
 
+import { secretsService } from '../../../services/secrets-service';
 import { EnableBankingError } from '../../utils/errors';
+import { enableBankingService } from '../enablebanking-service';
+
+import {
+  mockAspspList,
+  mockAuthResponse,
+  mockBalance,
+  mockCreditTransaction,
+  mockDebitTransaction,
+  mockSession,
+  mockSessionAccount,
+} from './fixtures';
 
 // Mock dependencies before importing the service
 vi.mock('../../../services/secrets-service', () => ({
@@ -29,20 +41,6 @@ vi.mock('../../utils/jwt', () => ({
 // Mock global fetch
 const mockFetch = vi.fn();
 vi.stubGlobal('fetch', mockFetch);
-
-import { secretsService } from '../../../services/secrets-service';
-import { enableBankingService } from '../enablebanking-service';
-
-import {
-  mockAspsp,
-  mockAspspList,
-  mockAuthResponse,
-  mockBalance,
-  mockCreditTransaction,
-  mockDebitTransaction,
-  mockSession,
-  mockSessionAccount,
-} from './fixtures';
 
 function mockFetchResponse(data: unknown, ok = true, status = 200) {
   mockFetch.mockResolvedValueOnce({
@@ -186,7 +184,7 @@ describe('enableBankingService', () => {
         }),
       );
 
-      const body = JSON.parse(mockFetch.mock.calls[0][1].body as string);
+      const body = JSON.parse(String(mockFetch.mock.calls[0][1].body));
       expect(body.aspsp).toEqual({ name: 'Nordea', country: 'FI' });
       expect(body.redirect_url).toBe('https://app.example.com/callback');
       expect(body.state).toBe('test-state-uuid');
@@ -206,7 +204,7 @@ describe('enableBankingService', () => {
         'state',
       );
 
-      const body = JSON.parse(mockFetch.mock.calls[0][1].body as string);
+      const body = JSON.parse(String(mockFetch.mock.calls[0][1].body));
       const validUntil = new Date(body.access.valid_until);
       const now = new Date();
       const diffDays = Math.round(

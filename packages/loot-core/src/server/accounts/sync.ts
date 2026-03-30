@@ -333,6 +333,7 @@ async function downloadEnableBankingTransactions(
     {
       'X-ACTUAL-TOKEN': userToken,
     },
+    60000,
   );
 
   if (res.error_code) {
@@ -1050,8 +1051,7 @@ async function processBankSyncDownload(
     if (customStartingDate) {
       startingBalanceDate = customStartingDate;
     } else if (transactions.length > 0) {
-      startingBalanceDate =
-        oldestTransaction.date ?? oldestTransaction.bookingDate;
+      startingBalanceDate = oldestTransaction.date;
     } else {
       startingBalanceDate = monthUtils.currentDay();
     }
@@ -1059,23 +1059,15 @@ async function processBankSyncDownload(
     const payee = await getStartingBalancePayee();
 
     return runMutator(async () => {
-      // Check if a starting balance transaction already exists for this account
-      const existingStartingBalance = await db.first(
-        'SELECT id FROM transactions WHERE acct = ? AND starting_balance_flag = 1 AND tombstone = 0',
-        [id],
-      );
-
-      const initialId = existingStartingBalance
-        ? existingStartingBalance.id
-        : await db.insertTransaction({
-            account: id,
-            amount: balanceToUse,
-            category: acctRow.offbudget === 0 ? payee.category : null,
-            payee: payee.id,
-            date: startingBalanceDate,
-            cleared: true,
-            starting_balance_flag: true,
-          });
+      const initialId = await db.insertTransaction({
+        account: id,
+        amount: balanceToUse,
+        category: acctRow.offbudget === 0 ? payee.category : null,
+        payee: payee.id,
+        date: startingBalanceDate,
+        cleared: true,
+        starting_balance_flag: true,
+      });
 
       const result = await reconcileTransactions(
         id,

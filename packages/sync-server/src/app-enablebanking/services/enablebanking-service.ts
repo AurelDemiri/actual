@@ -155,6 +155,7 @@ async function request<T>(
     throw handleEnableBankingError(response.status, responseBody);
   }
 
+  // eslint-disable-next-line typescript-eslint/no-unsafe-type-assertion -- generic API wrapper, type is validated by caller
   return (await response.json()) as T;
 }
 

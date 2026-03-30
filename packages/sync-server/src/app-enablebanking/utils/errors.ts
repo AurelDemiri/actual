@@ -22,9 +22,9 @@ export function handleEnableBankingError(
     typeof body === 'string' ? body : JSON.stringify(body ?? 'unknown');
   debug('Enable Banking API error: status=%d body=%s', statusCode, bodyStr);
 
-  const parsed =
+  const parsed: Record<string, unknown> =
     typeof body === 'object' && body !== null
-      ? (body as Record<string, unknown>)
+      ? Object.fromEntries(Object.entries(body))
       : {};
   const message = typeof parsed.message === 'string' ? parsed.message : bodyStr;
   const errorType = typeof parsed.error === 'string' ? parsed.error : 'UNKNOWN';
