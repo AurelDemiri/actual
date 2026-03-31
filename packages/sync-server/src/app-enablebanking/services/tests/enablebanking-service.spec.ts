@@ -274,6 +274,35 @@ describe('enableBankingService', () => {
       expect(result.balances).toHaveLength(1);
       expect(result.balances[0].balance_amount.amount).toBe('1234.56');
     });
+
+    it('forwards PSU headers when provided', async () => {
+      mockFetchResponse({ balances: [mockBalance] });
+
+      await enableBankingService.getBalances(mockSessionAccount.uid, {
+        'Psu-Ip-Address': '192.168.1.1',
+        'Psu-User-Agent': 'Mozilla/5.0',
+      });
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({
+          headers: expect.objectContaining({
+            'Psu-Ip-Address': '192.168.1.1',
+            'Psu-User-Agent': 'Mozilla/5.0',
+          }),
+        }),
+      );
+    });
+
+    it('omits PSU headers when not provided', async () => {
+      mockFetchResponse({ balances: [] });
+
+      await enableBankingService.getBalances(mockSessionAccount.uid);
+
+      const headers = mockFetch.mock.calls[0][1].headers;
+      expect(headers).not.toHaveProperty('Psu-Ip-Address');
+      expect(headers).not.toHaveProperty('Psu-User-Agent');
+    });
   });
 
   describe('#getTransactions', () => {
@@ -326,6 +355,27 @@ describe('enableBankingService', () => {
       );
 
       expect(result.continuation_key).toBe('next-page');
+    });
+
+    it('forwards PSU headers when provided', async () => {
+      mockFetchResponse({ transactions: [] });
+
+      await enableBankingService.getTransactions(
+        'uid',
+        '2026-01-01',
+        '2026-03-25',
+        undefined,
+        { 'Psu-Ip-Address': '10.0.0.1' },
+      );
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({
+          headers: expect.objectContaining({
+            'Psu-Ip-Address': '10.0.0.1',
+          }),
+        }),
+      );
     });
   });
 

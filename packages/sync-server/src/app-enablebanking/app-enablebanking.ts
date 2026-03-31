@@ -10,6 +10,7 @@ import {
   validateSessionMiddleware,
 } from '../util/middlewares';
 
+import type { PsuHeaders } from './services/enablebanking-service';
 import {
   enableBankingService,
   normalizeAccount,
@@ -26,11 +27,30 @@ app.use(express.json());
 
 // --- Shared helpers ---
 
-async function buildSessionResult(session: {
-  session_id: string;
-  accounts: { uid: string; [key: string]: unknown }[];
-  aspsp?: { name?: string; country?: string };
-}) {
+function extractPsuHeaders(req: Request): PsuHeaders {
+  const ip =
+    (typeof req.headers['x-forwarded-for'] === 'string'
+      ? req.headers['x-forwarded-for'].split(',')[0].trim()
+      : undefined) || req.ip;
+  const ua =
+    typeof req.headers['user-agent'] === 'string'
+      ? req.headers['user-agent']
+      : undefined;
+
+  const headers: PsuHeaders = {};
+  if (ip) headers['Psu-Ip-Address'] = ip;
+  if (ua) headers['Psu-User-Agent'] = ua;
+  return headers;
+}
+
+async function buildSessionResult(
+  session: {
+    session_id: string;
+    accounts: { uid: string; [key: string]: unknown }[];
+    aspsp?: { name?: string; country?: string };
+  },
+  psuHeaders?: PsuHeaders,
+) {
   const accountsWithBalances = await Promise.all(
     session.accounts.map(async account => {
       const normalized = normalizeAccount(
@@ -42,6 +62,7 @@ async function buildSessionResult(session: {
       try {
         const balanceResult = await enableBankingService.getBalances(
           account.uid,
+          psuHeaders,
         );
         balances = balanceResult.balances.map(normalizeBalance);
       } catch (err) {
@@ -99,7 +120,7 @@ app.get('/auth_callback', async (req: Request, res: Response) => {
       session.accounts.length,
     );
 
-    const result = await buildSessionResult(session);
+    const result = await buildSessionResult(session, extractPsuHeaders(req));
 
     // Always cache the result so retries within TTL can read it
     completedAuths.set(state, result);
@@ -322,7 +343,7 @@ app.post(
         session.accounts.length,
       );
 
-      const result = await buildSessionResult(session);
+      const result = await buildSessionResult(session, extractPsuHeaders(req));
 
       // Always cache so retries within TTL can read the result
       if (state) {
@@ -464,6 +485,8 @@ app.post(
       return;
     }
 
+    const psuHeaders = extractPsuHeaders(req);
+
     try {
       const dateTo = new Date().toISOString().split('T')[0];
       const dateFrom =
@@ -472,7 +495,10 @@ app.post(
           : new Date(startDate).toISOString().split('T')[0];
 
       // Fetch balances
-      const balanceResult = await enableBankingService.getBalances(accountId);
+      const balanceResult = await enableBankingService.getBalances(
+        accountId,
+        psuHeaders,
+      );
       const balances = balanceResult.balances.map(normalizeBalance);
 
       // Determine starting balance, preferring CLAV balance type
@@ -488,6 +514,7 @@ app.post(
         accountId,
         dateFrom,
         dateTo,
+        psuHeaders,
       );
 
       const all: ReturnType<typeof normalizeTransaction>[] = [];
