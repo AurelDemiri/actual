@@ -280,7 +280,7 @@ app.post(
 app.post(
   '/start-auth',
   handleError(async (req: Request, res: Response) => {
-    const { aspsp, redirectUrl } = req.body || {};
+    const { aspsp, redirectUrl, maxConsentValidity } = req.body || {};
 
     if (!aspsp || !redirectUrl) {
       res.send({
@@ -300,6 +300,7 @@ app.post(
         aspsp,
         redirectUrl,
         state,
+        typeof maxConsentValidity === 'number' ? maxConsentValidity : undefined,
       );
 
       res.send({

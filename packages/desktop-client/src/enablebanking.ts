@@ -23,12 +23,13 @@ function _authorize(
       modal: {
         name: 'enablebanking-external-msg',
         options: {
-          onMoveExternal: async ({ aspspId, country }) => {
+          onMoveExternal: async ({ aspspId, country, maxConsentValidity }) => {
             const redirectUrl = `${window.location.origin}/enablebanking/auth_callback`;
             const resp = await sendCatch('enablebanking-start-auth', {
               aspspId,
               country,
               redirectUrl,
+              maxConsentValidity,
             });
 
             if (resp.error) {

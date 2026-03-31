@@ -15,6 +15,7 @@ export type EnableBankingAspsp = {
   logo?: string;
   psu_types?: string[];
   beta?: boolean;
+  maximum_consent_validity?: number;
 };
 
 export type EnableBankingSessionAccount = {
