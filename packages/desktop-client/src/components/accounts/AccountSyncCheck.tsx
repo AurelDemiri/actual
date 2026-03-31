@@ -12,7 +12,8 @@ import type { AccountEntity } from 'loot-core/types/models';
 
 import { useUnlinkAccountMutation } from '@desktop-client/accounts';
 import { Link } from '@desktop-client/components/common/Link';
-import { authorizeBank } from '@desktop-client/gocardless';
+import { authorizeBank as authorizeEnableBanking } from '@desktop-client/enablebanking';
+import { authorizeBank as authorizeGoCardless } from '@desktop-client/gocardless';
 import { useAccounts } from '@desktop-client/hooks/useAccounts';
 import { useFailedAccounts } from '@desktop-client/hooks/useFailedAccounts';
 import { useDispatch } from '@desktop-client/redux';
@@ -104,7 +105,11 @@ export function AccountSyncCheck() {
       setOpen(false);
 
       if (acc.account_id) {
-        void authorizeBank(dispatch);
+        if (acc.account_sync_source === 'enableBanking') {
+          void authorizeEnableBanking(dispatch);
+        } else if (acc.account_sync_source === 'goCardless') {
+          void authorizeGoCardless(dispatch);
+        }
       }
     },
     [dispatch],
