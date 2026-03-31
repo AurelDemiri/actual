@@ -1,4 +1,5 @@
-import { type Algorithm, sign } from 'jws';
+import { sign } from 'jws';
+import type { Algorithm } from 'jws';
 
 type Header = { typ: string; alg: Algorithm; kid: string };
 
