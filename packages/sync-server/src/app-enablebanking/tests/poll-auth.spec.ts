@@ -456,7 +456,20 @@ describe('Enable Banking Express routes', () => {
         .post('/transactions')
         .send({ accountId: 'uid-1', startDate: '2026-01-01' });
 
-      expect(res.body.data.error).toBeDefined();
+      // 401 maps to ITEM_ERROR / ITEM_LOGIN_REQUIRED (expired session)
+      expect(res.body.data.error_type).toBe('ITEM_ERROR');
+      expect(res.body.data.error_code).toBe('ITEM_LOGIN_REQUIRED');
+    });
+
+    it('returns structured error for rate limit (429)', async () => {
+      mockFetchResponse({ message: 'Rate limit exceeded' }, false, 429);
+
+      const res = await request(app)
+        .post('/transactions')
+        .send({ accountId: 'uid-1', startDate: '2026-01-01' });
+
+      expect(res.body.data.error_type).toBe('RATE_LIMIT_EXCEEDED');
+      expect(res.body.data.error_code).toBe('RATE_LIMIT_EXCEEDED');
     });
 
     it('forwards PSU headers from the incoming request to the API', async () => {

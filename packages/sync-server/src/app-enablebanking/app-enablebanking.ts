@@ -17,6 +17,7 @@ import {
   normalizeBalance,
   normalizeTransaction,
 } from './services/enablebanking-service';
+import { EnableBankingError } from './utils/errors';
 
 const debug = createDebug('actual:enable-banking:app');
 
@@ -545,10 +546,36 @@ app.post(
       });
     } catch (error) {
       debug('Error fetching transactions: %s', error);
+
+      // Return structured error codes so the client can show
+      // appropriate UI (e.g. re-auth prompt for expired sessions)
+      if (error instanceof EnableBankingError) {
+        if (error.error_code === 'INVALID_ACCESS_TOKEN') {
+          res.send({
+            status: 'ok',
+            data: {
+              error_type: 'ITEM_ERROR',
+              error_code: 'ITEM_LOGIN_REQUIRED',
+            },
+          });
+          return;
+        }
+
+        res.send({
+          status: 'ok',
+          data: {
+            error_type: error.error_type,
+            error_code: error.error_code,
+          },
+        });
+        return;
+      }
+
       res.send({
         status: 'ok',
         data: {
-          error: error instanceof Error ? error.message : 'unknown error',
+          error_type: 'INTERNAL_ERROR',
+          error_code: 'INTERNAL_ERROR',
         },
       });
     }
