@@ -1,6 +1,6 @@
-import { sign } from 'jws';
+import { type Algorithm, sign } from 'jws';
 
-type Header = { typ: string; alg: string; kid: string };
+type Header = { typ: string; alg: Algorithm; kid: string };
 
 function getJWTHeader(applicationId: string): Header {
   return { typ: 'JWT', alg: 'RS256', kid: applicationId };
