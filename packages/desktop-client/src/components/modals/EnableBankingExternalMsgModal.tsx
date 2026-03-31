@@ -31,8 +31,14 @@ import { pushModal } from '@desktop-client/modals/modalsSlice';
 import type { Modal as ModalType } from '@desktop-client/modals/modalsSlice';
 import { useDispatch } from '@desktop-client/redux';
 
+type BankOption = {
+  id: string;
+  name: string;
+  maxConsentValidity?: number;
+};
+
 function useAvailableBanks(country: string, refetchKey?: boolean | null) {
-  const [banks, setBanks] = useState<{ id: string; name: string }[]>([]);
+  const [banks, setBanks] = useState<BankOption[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isError, setIsError] = useState(false);
 
@@ -62,6 +68,7 @@ function useAvailableBanks(country: string, refetchKey?: boolean | null) {
           aspsps.map(aspsp => ({
             id: `${aspsp.country}:${aspsp.name}`,
             name: aspsp.beta ? `${aspsp.name} (beta)` : aspsp.name,
+            maxConsentValidity: aspsp.maximum_consent_validity,
           })),
         );
       }
@@ -157,7 +164,13 @@ export function EnableBankingExternalMsgModal({
       const aspspCountry = selectedAspsp.slice(0, colonIndex);
       const aspspId = selectedAspsp.slice(colonIndex + 1);
 
-      const res = await onMoveExternal({ aspspId, country: aspspCountry });
+      const selectedBank = bankOptions.find(b => b.id === selectedAspsp);
+
+      const res = await onMoveExternal({
+        aspspId,
+        country: aspspCountry,
+        maxConsentValidity: selectedBank?.maxConsentValidity,
+      });
       if ('error' in res) {
         setError({
           code: res.error,

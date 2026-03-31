@@ -213,6 +213,65 @@ describe('enableBankingService', () => {
       expect(diffDays).toBeGreaterThanOrEqual(89);
       expect(diffDays).toBeLessThanOrEqual(91);
     });
+
+    it('caps consent at maxConsentValidity when shorter than 90 days', async () => {
+      mockFetchResponse(mockAuthResponse);
+
+      const thirtyDaysInSeconds = 30 * 24 * 60 * 60;
+      await enableBankingService.startAuth(
+        { name: 'Nordea', country: 'FI' },
+        'https://app.example.com/callback',
+        'state',
+        thirtyDaysInSeconds,
+      );
+
+      const body = JSON.parse(String(mockFetch.mock.calls[0][1].body));
+      const validUntil = new Date(body.access.valid_until);
+      const diffDays = Math.round(
+        (validUntil.getTime() - Date.now()) / (1000 * 60 * 60 * 24),
+      );
+      expect(diffDays).toBeGreaterThanOrEqual(29);
+      expect(diffDays).toBeLessThanOrEqual(31);
+    });
+
+    it('caps consent at 90 days when maxConsentValidity exceeds it', async () => {
+      mockFetchResponse(mockAuthResponse);
+
+      const oneYearInSeconds = 365 * 24 * 60 * 60;
+      await enableBankingService.startAuth(
+        { name: 'Nordea', country: 'FI' },
+        'https://app.example.com/callback',
+        'state',
+        oneYearInSeconds,
+      );
+
+      const body = JSON.parse(String(mockFetch.mock.calls[0][1].body));
+      const validUntil = new Date(body.access.valid_until);
+      const diffDays = Math.round(
+        (validUntil.getTime() - Date.now()) / (1000 * 60 * 60 * 24),
+      );
+      expect(diffDays).toBeGreaterThanOrEqual(89);
+      expect(diffDays).toBeLessThanOrEqual(91);
+    });
+
+    it('falls back to 90 days when maxConsentValidity is 0', async () => {
+      mockFetchResponse(mockAuthResponse);
+
+      await enableBankingService.startAuth(
+        { name: 'Nordea', country: 'FI' },
+        'https://app.example.com/callback',
+        'state',
+        0,
+      );
+
+      const body = JSON.parse(String(mockFetch.mock.calls[0][1].body));
+      const validUntil = new Date(body.access.valid_until);
+      const diffDays = Math.round(
+        (validUntil.getTime() - Date.now()) / (1000 * 60 * 60 * 24),
+      );
+      expect(diffDays).toBeGreaterThanOrEqual(89);
+      expect(diffDays).toBeLessThanOrEqual(91);
+    });
   });
 
   describe('#createSession', () => {

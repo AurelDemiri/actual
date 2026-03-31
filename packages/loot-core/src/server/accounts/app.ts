@@ -909,10 +909,12 @@ async function enableBankingStartAuth({
   aspspId,
   country,
   redirectUrl,
+  maxConsentValidity,
 }: {
   aspspId: string;
   country: string;
   redirectUrl: string;
+  maxConsentValidity?: number;
 }) {
   const userToken = await asyncStorage.getItem('user-token');
 
@@ -927,7 +929,7 @@ async function enableBankingStartAuth({
 
   return post(
     serverConfig.ENABLEBANKING_SERVER + '/start-auth',
-    { aspsp: { name: aspspId, country }, redirectUrl },
+    { aspsp: { name: aspspId, country }, redirectUrl, maxConsentValidity },
     {
       'X-ACTUAL-TOKEN': userToken,
     },

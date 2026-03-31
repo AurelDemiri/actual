@@ -132,6 +132,7 @@ export type Modal =
         onMoveExternal: (arg: {
           aspspId: string;
           country: string;
+          maxConsentValidity?: number;
         }) => Promise<
           | { error: 'timeout' }
           | { error: 'unknown'; message?: string }

@@ -290,9 +290,19 @@ export const enableBankingService = {
     aspsp: { name: string; country: string },
     redirectUrl: string,
     state: string,
+    maxConsentValidity?: number,
   ): Promise<EnableBankingAuthResponse> {
-    const validUntil = new Date();
-    validUntil.setDate(validUntil.getDate() + 90);
+    const DEFAULT_CONSENT_DAYS = 90;
+    const defaultMs = DEFAULT_CONSENT_DAYS * 24 * 60 * 60 * 1000;
+
+    // Respect the ASPSP's maximum_consent_validity (in seconds) if provided,
+    // capping at our default of 90 days.
+    const consentMs =
+      maxConsentValidity != null && maxConsentValidity > 0
+        ? Math.min(maxConsentValidity * 1000, defaultMs)
+        : defaultMs;
+
+    const validUntil = new Date(Date.now() + consentMs);
 
     return request<EnableBankingAuthResponse>('POST', '/auth', {
       aspsp: { name: aspsp.name, country: aspsp.country },
