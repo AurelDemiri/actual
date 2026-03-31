@@ -80,6 +80,13 @@ type NormalizedAccount = {
   iban?: string;
 };
 
+// --- PSU headers ---
+
+export type PsuHeaders = {
+  'Psu-Ip-Address'?: string;
+  'Psu-User-Agent'?: string;
+};
+
 // --- Helper functions ---
 
 function getCredentials(): { applicationId: string; secretKey: string } {
@@ -112,6 +119,7 @@ async function request<T>(
   path: string,
   body?: unknown,
   authHeaderOverride?: string,
+  psuHeaders?: PsuHeaders,
 ): Promise<T> {
   const url = `${BASE_URL}${path}`;
   debug('%s %s', method, url);
@@ -120,6 +128,17 @@ async function request<T>(
     Authorization: authHeaderOverride ?? getAuthorizationHeader(),
     'Content-Type': 'application/json',
   };
+
+  // Forward PSU headers to signal the end-user is online.
+  // This exempts the request from background data-fetch rate limits
+  // that many ASPSPs enforce (e.g. 4 requests/day).
+  if (psuHeaders) {
+    for (const [key, value] of Object.entries(psuHeaders)) {
+      if (value) {
+        headers[key] = value;
+      }
+    }
+  }
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
@@ -298,10 +317,14 @@ export const enableBankingService = {
 
   async getBalances(
     accountUid: string,
+    psuHeaders?: PsuHeaders,
   ): Promise<{ balances: EnableBankingBalance[] }> {
     return request<{ balances: EnableBankingBalance[] }>(
       'GET',
       `/accounts/${encodeURIComponent(accountUid)}/balances`,
+      undefined,
+      undefined,
+      psuHeaders,
     );
   },
 
@@ -310,6 +333,7 @@ export const enableBankingService = {
     dateFrom: string,
     dateTo: string,
     continuationKey?: string,
+    psuHeaders?: PsuHeaders,
   ): Promise<{
     transactions: EnableBankingTransaction[];
     continuation_key?: string;
@@ -321,13 +345,14 @@ export const enableBankingService = {
     return request<{
       transactions: EnableBankingTransaction[];
       continuation_key?: string;
-    }>('GET', path);
+    }>('GET', path, undefined, undefined, psuHeaders);
   },
 
   async getAllTransactions(
     accountUid: string,
     dateFrom: string,
     dateTo: string,
+    psuHeaders?: PsuHeaders,
   ): Promise<EnableBankingTransaction[]> {
     const allTransactions: EnableBankingTransaction[] = [];
     let continuationKey: string | undefined;
@@ -338,6 +363,7 @@ export const enableBankingService = {
         dateFrom,
         dateTo,
         continuationKey,
+        psuHeaders,
       );
       allTransactions.push(...result.transactions);
       continuationKey = result.continuation_key;

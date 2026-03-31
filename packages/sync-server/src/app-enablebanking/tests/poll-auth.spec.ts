@@ -458,5 +458,30 @@ describe('Enable Banking Express routes', () => {
 
       expect(res.body.data.error).toBeDefined();
     });
+
+    it('forwards PSU headers from the incoming request to the API', async () => {
+      // Mock getBalances
+      mockFetchResponse({ balances: [] });
+      // Mock getTransactions
+      mockFetchResponse({ transactions: [] });
+
+      await request(app)
+        .post('/transactions')
+        .set('X-Forwarded-For', '203.0.113.42, 10.0.0.1')
+        .set('User-Agent', 'TestBrowser/1.0')
+        .send({ accountId: 'uid-1', startDate: '2026-01-01' });
+
+      // Both the balance and transaction fetch calls should include PSU headers
+      for (const call of mockFetch.mock.calls) {
+        expect(call[1].headers).toHaveProperty(
+          'Psu-Ip-Address',
+          '203.0.113.42',
+        );
+        expect(call[1].headers).toHaveProperty(
+          'Psu-User-Agent',
+          'TestBrowser/1.0',
+        );
+      }
+    });
   });
 });
