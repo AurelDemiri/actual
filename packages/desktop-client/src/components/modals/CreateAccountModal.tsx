@@ -237,14 +237,16 @@ export function CreateAccountModal({
       await authorizeEnableBanking(dispatch);
     } catch (err) {
       console.error(err);
-      addNotification({
-        notification: {
-          type: 'error',
-          title: t('Error when trying to contact Enable Banking'),
-          message: (err as Error).message,
-          timeout: 5000,
-        },
-      });
+      dispatch(
+        addNotification({
+          notification: {
+            type: 'error',
+            title: t('Error when trying to contact Enable Banking'),
+            message: (err as Error).message,
+            timeout: 5000,
+          },
+        }),
+      );
       dispatch(
         pushModal({
           modal: {

@@ -47,6 +47,11 @@ describe('normalizeTransaction', () => {
     expect(result.transactionId).toBe('tx-003');
   });
 
+  it('should preserve original sign when credit_debit_indicator is absent', () => {
+    const result = normalizeTransaction(mockPendingTransaction);
+    expect(result.transactionAmount.amount).toBe('-10.00');
+  });
+
   it('should fall back to remittance_information for payee when no creditor/debtor', () => {
     const result = normalizeTransaction(mockTransactionNoPayee);
     expect(result.payeeName).toBe('Transfer from savings');

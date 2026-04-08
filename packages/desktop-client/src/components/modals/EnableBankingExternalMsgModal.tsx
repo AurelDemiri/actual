@@ -152,7 +152,11 @@ export function EnableBankingExternalMsgModal({
   const isJumpingRef = useRef(false);
 
   async function onJump() {
-    if (isJumpingRef.current) return;
+    if (isJumpingRef.current) {
+      // Abort the in-flight poll so the user can retry
+      await sendCatch('enablebanking-poll-auth-stop');
+      return;
+    }
     isJumpingRef.current = true;
 
     try {

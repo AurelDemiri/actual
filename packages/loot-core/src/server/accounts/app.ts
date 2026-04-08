@@ -933,7 +933,7 @@ async function enableBankingStartAuth({
     (!Number.isFinite(maxConsentValidity) ||
       !Number.isInteger(maxConsentValidity) ||
       maxConsentValidity <= 0 ||
-      maxConsentValidity > 3650)
+      maxConsentValidity > 315_360_000)
   ) {
     return { error: 'invalid_max_consent_validity' };
   }
@@ -983,7 +983,7 @@ async function enableBankingCompleteAuth({
   );
 }
 
-let enableBankingPollController: AbortController | null = null;
+const enableBankingPollControllers = new Map<string, AbortController>();
 
 async function enableBankingPollAuth({ state }: { state: string }) {
   const userToken = await asyncStorage.getItem('user-token');
@@ -998,7 +998,7 @@ async function enableBankingPollAuth({ state }: { state: string }) {
   }
 
   const controller = new AbortController();
-  enableBankingPollController = controller;
+  enableBankingPollControllers.set(state, controller);
 
   try {
     return await post(
@@ -1011,17 +1011,16 @@ async function enableBankingPollAuth({ state }: { state: string }) {
       controller.signal,
     );
   } finally {
-    // Only clear if this is still the active controller
-    if (enableBankingPollController === controller) {
-      enableBankingPollController = null;
+    if (enableBankingPollControllers.get(state) === controller) {
+      enableBankingPollControllers.delete(state);
     }
   }
 }
 
 async function stopEnableBankingPollAuth() {
-  if (enableBankingPollController) {
-    enableBankingPollController.abort();
-    enableBankingPollController = null;
+  for (const [state, controller] of enableBankingPollControllers) {
+    controller.abort();
+    enableBankingPollControllers.delete(state);
   }
   return 'ok';
 }

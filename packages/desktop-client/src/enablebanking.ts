@@ -81,6 +81,18 @@ function _authorize(
             }
 
             const pollData = pollResp.data;
+
+            // The poll response body itself may carry an error (e.g. when
+            // the bank callback failed before the poll started).
+            const pollError = pollData?.data?.error ?? pollData?.error;
+            if (pollError) {
+              return {
+                error: 'unknown' as const,
+                message:
+                  typeof pollError === 'string' ? pollError : String(pollError),
+              };
+            }
+
             const accounts: SyncServerEnableBankingAccount[] =
               pollData?.data?.accounts ?? pollData?.accounts ?? [];
 

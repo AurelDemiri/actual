@@ -9,7 +9,7 @@ export type FeatureFlag =
   | 'customThemes'
   | 'budgetAnalysisReport'
   | 'payeeLocations'
-  | 'enableBanking';
+  | 'enableBanking'
   | 'sankeyReport';
 
 /**

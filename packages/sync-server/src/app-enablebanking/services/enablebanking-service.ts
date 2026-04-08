@@ -208,10 +208,18 @@ export function normalizeTransaction(
     ? tx.remittance_information.join(' ')
     : undefined;
 
-  // Normalize amount: strip any existing sign, then prefix '-' for debits
-  const rawAmount = tx.transaction_amount.amount.trim().replace(/^[+-]/, '');
-  const signedAmount =
-    tx.credit_debit_indicator === 'DBIT' ? '-' + rawAmount : rawAmount;
+  // Normalize amount based on credit/debit indicator.
+  // When indicator is present, strip existing sign and apply the correct one.
+  // When absent, preserve the original sign from the bank.
+  const trimmedAmount = tx.transaction_amount.amount.trim();
+  let signedAmount: string;
+  if (tx.credit_debit_indicator === 'DBIT') {
+    signedAmount = '-' + trimmedAmount.replace(/^[+-]/, '');
+  } else if (tx.credit_debit_indicator === 'CRDT') {
+    signedAmount = trimmedAmount.replace(/^[+-]/, '');
+  } else {
+    signedAmount = trimmedAmount;
+  }
 
   return {
     transactionId,
@@ -366,7 +374,6 @@ export const enableBankingService = {
   ): Promise<EnableBankingTransaction[]> {
     const allTransactions: EnableBankingTransaction[] = [];
     let continuationKey: string | undefined;
-    let previousContinuationKey: string | undefined;
     const maxIterations = 100;
     let iteration = 0;
 
@@ -382,12 +389,11 @@ export const enableBankingService = {
 
       if (
         result.continuation_key &&
-        result.continuation_key === previousContinuationKey
+        result.continuation_key === continuationKey
       ) {
         break;
       }
 
-      previousContinuationKey = continuationKey;
       continuationKey = result.continuation_key;
       iteration++;
     } while (continuationKey && iteration < maxIterations);

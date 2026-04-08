@@ -14,7 +14,9 @@ export function EnableBankingCallback() {
   const [code] = useUrlParam('code');
   const [stateParam] = useUrlParam('state');
   const [errorParam] = useUrlParam('error');
-  const state = stateParam || localStorage.getItem('enablebanking_auth_state');
+  const storedState = localStorage.getItem('enablebanking_auth_state');
+  const stateValid = !stateParam || !storedState || stateParam === storedState;
+  const state = stateValid ? stateParam || storedState : null;
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>(
     'loading',
   );
@@ -39,6 +41,12 @@ export function EnableBankingCallback() {
       if (!code) {
         setStatus('error');
         setErrorMessage(t('Missing authorization parameters.'));
+        return;
+      }
+
+      if (!stateValid) {
+        setStatus('error');
+        setErrorMessage(t('Authorization state mismatch. Please try again.'));
         return;
       }
 
@@ -76,7 +84,7 @@ export function EnableBankingCallback() {
     }
 
     void handleCallback();
-  }, [code, state, stateParam, errorParam, t]);
+  }, [code, state, stateParam, stateValid, errorParam, t]);
 
   return (
     <View

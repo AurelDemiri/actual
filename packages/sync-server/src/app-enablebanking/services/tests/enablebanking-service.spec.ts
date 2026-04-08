@@ -489,6 +489,26 @@ describe('enableBankingService', () => {
 
       expect(result).toHaveLength(0);
     });
+
+    it('breaks out of pagination when continuation_key repeats', async () => {
+      mockFetchResponse({
+        transactions: [mockCreditTransaction],
+        continuation_key: 'stuck-key',
+      });
+      mockFetchResponse({
+        transactions: [mockDebitTransaction],
+        continuation_key: 'stuck-key',
+      });
+
+      const result = await enableBankingService.getAllTransactions(
+        'uid',
+        '2026-01-01',
+        '2026-03-25',
+      );
+
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+      expect(result).toHaveLength(2);
+    });
   });
 
   describe('error handling', () => {
