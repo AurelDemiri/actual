@@ -224,10 +224,6 @@ export function CreateAccountModal({
   };
 
   const onConnectEnableBanking = async () => {
-    if (isEnableBankingSetupComplete === null) {
-      // Still loading — ignore click
-      return;
-    }
     if (isEnableBankingSetupComplete === false) {
       onEnableBankingInit();
       return;
@@ -392,7 +388,7 @@ export function CreateAccountModal({
     setIsPluggyAiSetupComplete(configuredPluggyAi);
   }, [configuredPluggyAi]);
 
-  const { configuredEnableBanking } =
+  const { configuredEnableBanking, isLoading: isEnableBankingLoading } =
     useEnableBankingStatus(enableBankingEnabled);
   useEffect(() => {
     setIsEnableBankingSetupComplete(configuredEnableBanking);
@@ -662,7 +658,11 @@ export function CreateAccountModal({
                             }}
                           >
                             <ButtonWithLoading
-                              isDisabled={syncServerStatus !== 'online'}
+                              isDisabled={
+                                syncServerStatus !== 'online' ||
+                                isEnableBankingLoading
+                              }
+                              isLoading={isEnableBankingLoading}
                               style={{
                                 padding: '10px 0',
                                 fontSize: 15,
