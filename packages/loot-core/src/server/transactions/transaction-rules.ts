@@ -599,22 +599,26 @@ export function conditionsToAQL(
         }
         return { $or: values.map(v => apply(field, '$eq', v)) };
 
-      case 'hasTags':
+      case 'hasTags': {
         const tagValues = [];
+        const seenTags = new Set();
         for (const [_, tag] of value.matchAll(/(?<!#)(#[^#\s]+)/g)) {
-          if (!tagValues.find(t => t.tag === tag)) {
+          if (!seenTags.has(tag)) {
+            seenTags.add(tag);
             tagValues.push(tag);
           }
         }
 
         return {
           $and: tagValues.map(v => {
-            const regex = new RegExp(
-              `(?<!#)${v.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}([\\s#]|$)`,
-            );
-            return apply(field, '$regexp', regex.source);
+            const escapedTag = v
+              .replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+              .replace(/\\\$/g, '[$]'); // Use '[$]' instead of '\$' so AQL string unescaping doesn't turn it into a bare '$' end-of-string anchor
+            const pattern = `(?<!#)${escapedTag}([\\s#]|$)`;
+            return apply(field, '$regexp', pattern);
           }),
         };
+      }
 
       case 'notOneOf':
         const notValues = value;
