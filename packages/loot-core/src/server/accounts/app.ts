@@ -196,22 +196,28 @@ async function linkGoCardlessAccount({
     });
   }
 
-  const syncRes = await bankSync.syncAccount(
-    undefined,
-    undefined,
-    id,
-    account.account_id,
-    bank.bank_id,
-    startingDate,
-    startingBalance,
-  );
+  connection.send('accounts-sync-started', { ids: [id] });
 
-  await handleSyncResponse(syncRes, id);
+  try {
+    const syncRes = await bankSync.syncAccount(
+      undefined,
+      undefined,
+      id,
+      account.account_id,
+      bank.bank_id,
+      startingDate,
+      startingBalance,
+    );
 
-  connection.send('sync-event', {
-    type: 'success',
-    tables: ['transactions'],
-  });
+    await handleSyncResponse(syncRes, id);
+
+    connection.send('sync-event', {
+      type: 'success',
+      tables: ['transactions'],
+    });
+  } finally {
+    connection.send('accounts-sync-finished', { ids: [id] });
+  }
 
   return 'ok';
 }
@@ -270,22 +276,28 @@ async function linkSimpleFinAccount({
     });
   }
 
-  const syncRes = await bankSync.syncAccount(
-    undefined,
-    undefined,
-    id,
-    externalAccount.account_id,
-    bank.bank_id,
-    startingDate,
-    startingBalance,
-  );
+  connection.send('accounts-sync-started', { ids: [id] });
 
-  await handleSyncResponse(syncRes, id);
+  try {
+    const syncRes = await bankSync.syncAccount(
+      undefined,
+      undefined,
+      id,
+      externalAccount.account_id,
+      bank.bank_id,
+      startingDate,
+      startingBalance,
+    );
 
-  connection.send('sync-event', {
-    type: 'success',
-    tables: ['transactions'],
-  });
+    await handleSyncResponse(syncRes, id);
+
+    connection.send('sync-event', {
+      type: 'success',
+      tables: ['transactions'],
+    });
+  } finally {
+    connection.send('accounts-sync-finished', { ids: [id] });
+  }
 
   return 'ok';
 }
@@ -344,22 +356,28 @@ async function linkPluggyAiAccount({
     });
   }
 
-  const syncRes = await bankSync.syncAccount(
-    undefined,
-    undefined,
-    id,
-    externalAccount.account_id,
-    bank.bank_id,
-    startingDate,
-    startingBalance,
-  );
+  connection.send('accounts-sync-started', { ids: [id] });
 
-  await handleSyncResponse(syncRes, id);
+  try {
+    const syncRes = await bankSync.syncAccount(
+      undefined,
+      undefined,
+      id,
+      externalAccount.account_id,
+      bank.bank_id,
+      startingDate,
+      startingBalance,
+    );
 
-  connection.send('sync-event', {
-    type: 'success',
-    tables: ['transactions'],
-  });
+    await handleSyncResponse(syncRes, id);
+
+    connection.send('sync-event', {
+      type: 'success',
+      tables: ['transactions'],
+    });
+  } finally {
+    connection.send('accounts-sync-finished', { ids: [id] });
+  }
 
   return 'ok';
 }

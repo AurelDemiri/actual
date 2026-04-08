@@ -5,6 +5,7 @@ import { listen } from 'loot-core/platform/client/connection';
 import * as undo from 'loot-core/platform/client/undo';
 
 import { accountQueries } from './accounts';
+import { setAccountsSyncing } from './accounts/accountsSlice';
 import { setAppState } from './app/appSlice';
 import { categoryQueries } from './budget';
 import { closeBudgetUI } from './budgetfiles/budgetfilesSlice';
@@ -163,6 +164,24 @@ export function handleGlobalEvents(store: AppStore, queryClient: QueryClient) {
     void window.Actual.reload();
   });
 
+  const unlistenAccountsSyncStarted = listen(
+    'accounts-sync-started',
+    ({ ids }) => {
+      const current = store.getState().account.accountsSyncing;
+      const merged = [...new Set([...current, ...ids])];
+      store.dispatch(setAccountsSyncing({ ids: merged }));
+    },
+  );
+
+  const unlistenAccountsSyncFinished = listen(
+    'accounts-sync-finished',
+    ({ ids }) => {
+      const current = store.getState().account.accountsSyncing;
+      const remaining = current.filter(id => !ids.includes(id));
+      store.dispatch(setAccountsSyncing({ ids: remaining }));
+    },
+  );
+
   return () => {
     unlistenServerError();
     unlistenOrphanedPayees();
@@ -176,5 +195,7 @@ export function handleGlobalEvents(store: AppStore, queryClient: QueryClient) {
     unlistenFinishImport();
     unlistenShowBudgets();
     unlistenApiFetchRedirected();
+    unlistenAccountsSyncStarted();
+    unlistenAccountsSyncFinished();
   };
 }
