@@ -66,8 +66,12 @@ type ShowBudgetsEvent = undefined;
 type StartImportEvent = { budgetName: string };
 type StartLoadEvent = undefined;
 type ApiFetchRedirectedEvent = undefined;
+type AccountsSyncStartedEvent = { ids: string[] };
+type AccountsSyncFinishedEvent = { ids: string[] };
 
 export type ServerEvents = {
+  'accounts-sync-started': AccountsSyncStartedEvent;
+  'accounts-sync-finished': AccountsSyncFinishedEvent;
   'backups-updated': BackupUpdatedEvent;
   'cells-changed': CellsChangedEvent;
   'fallback-write-error': FallbackWriteErrorEvent;
