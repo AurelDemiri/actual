@@ -4,7 +4,7 @@ import {
   normalizeAccount,
   normalizeBalance,
   normalizeTransaction,
-} from '../enablebanking-service';
+} from '#app-enablebanking/services/enablebanking-service';
 
 import {
   mockBalance,

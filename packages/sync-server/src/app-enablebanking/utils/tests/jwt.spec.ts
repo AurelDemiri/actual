@@ -1,7 +1,7 @@
 import { sign } from 'jws';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { getJWT } from '../jwt';
+import { getJWT } from '#app-enablebanking/utils/jwt';
 
 // Mock jws to avoid needing real RSA keys
 vi.mock('jws', () => ({

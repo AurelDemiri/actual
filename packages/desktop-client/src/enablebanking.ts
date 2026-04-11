@@ -1,7 +1,6 @@
+import { sendCatch } from '@actual-app/core/platform/client/connection';
+import type { SyncServerEnableBankingAccount } from '@actual-app/core/types/models';
 import { t } from 'i18next';
-
-import { sendCatch } from 'loot-core/platform/client/connection';
-import type { SyncServerEnableBankingAccount } from 'loot-core/types/models';
 
 import { pushModal } from './modals/modalsSlice';
 import type { AppDispatch } from './redux/store';

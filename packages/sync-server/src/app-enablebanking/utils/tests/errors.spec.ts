@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
-import { EnableBankingError, handleEnableBankingError } from '../errors';
+import {
+  EnableBankingError,
+  handleEnableBankingError,
+} from '#app-enablebanking/utils/errors';
 
 describe('EnableBankingError', () => {
   it('should create an error with type and code', () => {

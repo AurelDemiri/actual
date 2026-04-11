@@ -3,11 +3,10 @@ import { Trans, useTranslation } from 'react-i18next';
 
 import { Paragraph } from '@actual-app/components/paragraph';
 import { View } from '@actual-app/components/view';
+import { send } from '@actual-app/core/platform/client/connection';
 
-import { send } from 'loot-core/platform/client/connection';
-
-import { Error as ErrorAlert } from '@desktop-client/components/alerts';
-import { useUrlParam } from '@desktop-client/hooks/useUrlParam';
+import { Error as ErrorAlert } from '#components/alerts';
+import { useUrlParam } from '#hooks/useUrlParam';
 
 export function EnableBankingCallback() {
   const { t } = useTranslation();

@@ -3,12 +3,12 @@ import type { Request, Response } from 'express';
 import express from 'express';
 import { v4 as uuidv4 } from 'uuid';
 
-import { handleError } from '../app-gocardless/util/handle-error';
-import { SecretName, secretsService } from '../services/secrets-service';
+import { handleError } from '#app-gocardless/util/handle-error';
+import { SecretName, secretsService } from '#services/secrets-service';
 import {
   requestLoggerMiddleware,
   validateSessionMiddleware,
-} from '../util/middlewares';
+} from '#util/middlewares';
 
 import type { PsuHeaders } from './services/enablebanking-service';
 import {

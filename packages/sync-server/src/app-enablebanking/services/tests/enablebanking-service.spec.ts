@@ -8,9 +8,9 @@ import {
   vi,
 } from 'vitest';
 
-import { secretsService } from '../../../services/secrets-service';
-import { EnableBankingError } from '../../utils/errors';
-import { enableBankingService } from '../enablebanking-service';
+import { enableBankingService } from '#app-enablebanking/services/enablebanking-service';
+import { EnableBankingError } from '#app-enablebanking/utils/errors';
+import { secretsService } from '#services/secrets-service';
 
 import {
   mockAspspList,

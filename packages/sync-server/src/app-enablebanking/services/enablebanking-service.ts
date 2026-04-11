@@ -1,8 +1,11 @@
 import createDebug from 'debug';
 
-import { SecretName, secretsService } from '../../services/secrets-service';
-import { EnableBankingError, handleEnableBankingError } from '../utils/errors';
-import { getJWT } from '../utils/jwt';
+import {
+  EnableBankingError,
+  handleEnableBankingError,
+} from '#app-enablebanking/utils/errors';
+import { getJWT } from '#app-enablebanking/utils/jwt';
+import { SecretName, secretsService } from '#services/secrets-service';
 
 const debug = createDebug('actual:enable-banking:service');
 
