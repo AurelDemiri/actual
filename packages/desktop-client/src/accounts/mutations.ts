@@ -392,14 +392,21 @@ export function useLinkAccountMutation() {
       startingDate,
       startingBalance,
     }: LinkAccountPayload) => {
-      await send('gocardless-accounts-link', {
-        requisitionId,
-        account,
-        upgradingId,
-        offBudget,
-        startingDate,
-        startingBalance,
-      });
+      const accountId = upgradingId ?? uuidv4();
+      dispatch(setAccountsSyncing({ ids: [accountId] }));
+      try {
+        await send('gocardless-accounts-link', {
+          requisitionId,
+          account,
+          upgradingId,
+          newAccountId: accountId,
+          offBudget,
+          startingDate,
+          startingBalance,
+        });
+      } finally {
+        dispatch(setAccountsSyncing({ ids: [] }));
+      }
     },
     onSuccess: () => {
       invalidateQueries(queryClient);
@@ -433,13 +440,20 @@ export function useLinkAccountSimpleFinMutation() {
       startingDate,
       startingBalance,
     }: LinkAccountSimpleFinPayload) => {
-      await send('simplefin-accounts-link', {
-        externalAccount,
-        upgradingId,
-        offBudget,
-        startingDate,
-        startingBalance,
-      });
+      const accountId = upgradingId ?? uuidv4();
+      dispatch(setAccountsSyncing({ ids: [accountId] }));
+      try {
+        await send('simplefin-accounts-link', {
+          externalAccount,
+          upgradingId,
+          newAccountId: accountId,
+          offBudget,
+          startingDate,
+          startingBalance,
+        });
+      } finally {
+        dispatch(setAccountsSyncing({ ids: [] }));
+      }
     },
     onSuccess: () => {
       invalidateQueries(queryClient);
@@ -475,13 +489,20 @@ export function useLinkAccountPluggyAiMutation() {
       startingDate,
       startingBalance,
     }: LinkAccountPluggyAiPayload) => {
-      await send('pluggyai-accounts-link', {
-        externalAccount,
-        upgradingId,
-        offBudget,
-        startingDate,
-        startingBalance,
-      });
+      const accountId = upgradingId ?? uuidv4();
+      dispatch(setAccountsSyncing({ ids: [accountId] }));
+      try {
+        await send('pluggyai-accounts-link', {
+          externalAccount,
+          upgradingId,
+          newAccountId: accountId,
+          offBudget,
+          startingDate,
+          startingBalance,
+        });
+      } finally {
+        dispatch(setAccountsSyncing({ ids: [] }));
+      }
     },
     onSuccess: () => {
       invalidateQueries(queryClient);

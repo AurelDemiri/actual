@@ -42,6 +42,7 @@ import * as bankSync from './sync';
 // Shared base type for link account parameters
 type LinkAccountBaseParams = {
   upgradingId?: AccountEntity['id'];
+  newAccountId?: AccountEntity['id'];
   offBudget?: boolean;
   startingDate?: string;
   startingBalance?: number;
@@ -151,6 +152,7 @@ async function linkGoCardlessAccount({
   requisitionId,
   account,
   upgradingId,
+  newAccountId,
   offBudget = false,
   startingDate,
   startingBalance,
@@ -179,7 +181,7 @@ async function linkGoCardlessAccount({
       account_sync_source: 'goCardless',
     });
   } else {
-    id = uuidv4();
+    id = newAccountId ?? uuidv4();
     await db.insertWithUUID('accounts', {
       id,
       account_id: account.account_id,
@@ -219,6 +221,7 @@ async function linkGoCardlessAccount({
 async function linkSimpleFinAccount({
   externalAccount,
   upgradingId,
+  newAccountId,
   offBudget = false,
   startingDate,
   startingBalance,
@@ -254,7 +257,7 @@ async function linkSimpleFinAccount({
       account_sync_source: 'simpleFin',
     });
   } else {
-    id = uuidv4();
+    id = newAccountId ?? uuidv4();
     await db.insertWithUUID('accounts', {
       id,
       account_id: externalAccount.account_id,
@@ -293,6 +296,7 @@ async function linkSimpleFinAccount({
 async function linkPluggyAiAccount({
   externalAccount,
   upgradingId,
+  newAccountId,
   offBudget = false,
   startingDate,
   startingBalance,
@@ -328,7 +332,7 @@ async function linkPluggyAiAccount({
       account_sync_source: 'pluggyai',
     });
   } else {
-    id = uuidv4();
+    id = newAccountId ?? uuidv4();
     await db.insertWithUUID('accounts', {
       id,
       account_id: externalAccount.account_id,
