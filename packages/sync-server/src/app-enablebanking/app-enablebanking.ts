@@ -29,10 +29,7 @@ app.use(express.json());
 // --- Shared helpers ---
 
 function extractPsuHeaders(req: Request): PsuHeaders {
-  const ip =
-    (typeof req.headers['x-forwarded-for'] === 'string'
-      ? req.headers['x-forwarded-for'].split(',')[0].trim()
-      : undefined) || req.ip;
+  const ip = req.ip;
   const ua =
     typeof req.headers['user-agent'] === 'string'
       ? req.headers['user-agent']
@@ -414,6 +411,8 @@ app.post(
         return;
       }
 
+      let clientDisconnected = false;
+
       const result = await new Promise((resolve, reject) => {
         // Clean up any existing waiter for this state
         if (pendingAuths.has(state)) {
@@ -449,24 +448,29 @@ app.post(
         // Clean up if client disconnects before resolution
         res.on('close', () => {
           if (!res.writableFinished && !settled) {
+            clientDisconnected = true;
             cleanupPendingAuth(state, waiterId);
             safeReject(new Error('Client disconnected'));
           }
         });
       });
 
-      res.send({
-        status: 'ok',
-        data: result,
-      });
+      if (!clientDisconnected) {
+        res.send({
+          status: 'ok',
+          data: result,
+        });
+      }
     } catch (error) {
       cleanupPendingAuth(state, waiterId);
-      res.send({
-        status: 'ok',
-        data: {
-          error: error instanceof Error ? error.message : 'unknown error',
-        },
-      });
+      if (!res.writableEnded && !res.destroyed) {
+        res.send({
+          status: 'ok',
+          data: {
+            error: error instanceof Error ? error.message : 'unknown error',
+          },
+        });
+      }
     }
   }),
 );
