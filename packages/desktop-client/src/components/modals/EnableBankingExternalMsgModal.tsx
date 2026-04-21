@@ -1,5 +1,4 @@
-// @ts-strict-ignore
-import React, { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 
 import { Button } from '@actual-app/components/button';
@@ -32,7 +31,10 @@ type BankOption = {
   maxConsentValidity?: number;
 };
 
-function useAvailableBanks(country: string, refetchKey?: boolean | null) {
+function useAvailableBanks(
+  country: string | undefined,
+  refetchKey?: boolean | null,
+) {
   const [banks, setBanks] = useState<BankOption[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isError, setIsError] = useState(false);
@@ -152,6 +154,7 @@ export function EnableBankingExternalMsgModal({
       await sendCatch('enablebanking-poll-auth-stop');
       return;
     }
+    if (!selectedAspsp) return;
     isJumpingRef.current = true;
 
     try {
