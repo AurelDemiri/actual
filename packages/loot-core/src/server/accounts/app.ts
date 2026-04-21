@@ -382,7 +382,7 @@ async function linkEnableBankingAccount({
 }: LinkAccountBaseParams & {
   externalAccount: SyncServerEnableBankingAccount;
 }) {
-  let id;
+  let id: string | undefined;
 
   const institution = {
     name: externalAccount.institution ?? t('Unknown'),
@@ -431,7 +431,7 @@ async function linkEnableBankingAccount({
     });
   }
 
-  await bankSync.syncAccount(
+  const syncRes = await bankSync.syncAccount(
     undefined,
     undefined,
     id,
@@ -440,6 +440,8 @@ async function linkEnableBankingAccount({
     startingDate,
     startingBalance,
   );
+
+  await handleSyncResponse(syncRes, id);
 
   connection.send('sync-event', {
     type: 'success',

@@ -36,7 +36,6 @@ export const mockSessionAccount = {
 export const mockSessionAccountNoName = {
   account_id: { iban: 'FI9876543210000001' },
   account_servicer: { bic_fi: 'OKOYFIHH', name: 'OP' },
-  name: undefined,
   currency: 'EUR',
   uid: '12345678-1234-1234-1234-123456789abc',
 };
