@@ -59,7 +59,7 @@ type EnableBankingAuthResponse = {
   authorization_id: string;
 };
 
-type BankSyncTransaction = {
+type BankSyncTransaction = EnableBankingTransaction & {
   transactionId: string;
   date: string;
   bookingDate: string;
@@ -67,6 +67,7 @@ type BankSyncTransaction = {
   transactionAmount: { amount: string; currency: string };
   payeeName: string;
   remittanceInformationUnstructured?: string;
+  remittanceInformationUnstructuredArrayString?: string;
   notes?: string;
   booked: boolean;
 };
@@ -230,6 +231,7 @@ export function normalizeTransaction(
   }
 
   return {
+    ...tx,
     transactionId,
     date: bookingDate,
     bookingDate,
@@ -240,6 +242,9 @@ export function normalizeTransaction(
     },
     payeeName,
     remittanceInformationUnstructured,
+    remittanceInformationUnstructuredArrayString: tx.remittance_information
+      ? tx.remittance_information.join(', ')
+      : undefined,
     notes: remittanceInformationUnstructured,
     booked: tx.status !== 'PDNG',
   };
