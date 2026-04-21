@@ -5,6 +5,7 @@ import {
   handleEnableBankingError,
 } from '#app-enablebanking/utils/errors';
 import { getJWT } from '#app-enablebanking/utils/jwt';
+import { stripSepaTokens } from '#app-enablebanking/utils/strip-sepa-tokens';
 import { SecretName, secretsService } from '#services/secrets-service';
 
 const debug = createDebug('actual:enable-banking:service');
@@ -66,6 +67,7 @@ type BankSyncTransaction = {
   transactionAmount: { amount: string; currency: string };
   payeeName: string;
   remittanceInformationUnstructured?: string;
+  notes?: string;
   booked: boolean;
 };
 
@@ -204,11 +206,14 @@ export function normalizeTransaction(
     tx.remittance_information &&
     tx.remittance_information.length > 0
   ) {
-    payeeName = tx.remittance_information[0];
+    payeeName = stripSepaTokens(tx.remittance_information[0]);
   }
 
-  const remittanceInformationUnstructured = tx.remittance_information
-    ? tx.remittance_information.join(' ')
+  const remittanceCleaned = tx.remittance_information
+    ? stripSepaTokens(tx.remittance_information.join(' '))
+    : '';
+  const remittanceInformationUnstructured = remittanceCleaned
+    ? remittanceCleaned
     : undefined;
 
   // Normalize amount based on credit/debit indicator.
@@ -235,6 +240,7 @@ export function normalizeTransaction(
     },
     payeeName,
     remittanceInformationUnstructured,
+    notes: remittanceInformationUnstructured,
     booked: tx.status !== 'PDNG',
   };
 }
